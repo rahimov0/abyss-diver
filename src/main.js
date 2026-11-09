@@ -1,4 +1,3 @@
-import './style.css';
 import { Input } from './engine/input.js';
 import { Audio } from './engine/audio.js';
 import { loadSave } from './game/save.js';
