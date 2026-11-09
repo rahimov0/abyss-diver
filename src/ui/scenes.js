@@ -1,0 +1,441 @@
+// Title, level select and play scenes (all drawn on the pixel canvas)
+import { drawText, wrap } from '../engine/font.js';
+import { LEVELS } from '../level/levels.js';
+import { BIOME } from '../gfx/biomes.js';
+import { World } from '../game/world.js';
+import { buildSprites } from '../gfx/sprites.js';
+import { disc, px, mix, hash } from '../gfx/pixel.js';
+import { writeSave } from '../game/save.js';
+
+export const VERSION = 'V3.0';
+
+const TIPS = {
+  1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL!',
+  2: 'FISH BITE! PRESS SPACE / DASH TO RAM THROUGH THEM.',
+  3: 'CRABS CAN BE DASHED. SPIKY URCHINS CANNOT!',
+  4: 'JELLYFISH STING. DASHING WONT HELP - DODGE THEM.',
+  5: 'DASH INTO CRACKED ROCK TO FIND SECRET TREASURE.',
+  6: 'WATCH YOUR AIR! REFILL AT THE BUBBLE VENTS. CURRENTS PUSH YOU.',
+  7: 'PUFFERS PUFF UP WHEN YOU COME CLOSE. HIT THEM WHILE SMALL.',
+  8: 'GEYSERS LIFT YOU UPWARD.',
+  9: 'LOCKED GATE AHEAD - FIND THE MATCHING KEY.',
+  10: 'EELS LUNGE OUT OF THE WALLS.',
+  11: 'CLAMS SPIT PEARLS. DASH THEM WHILE OPEN.',
+  12: 'NAVAL MINES EXPLODE ON CONTACT.',
+  13: 'LOOSE DEBRIS FALLS WHEN YOU PASS BELOW.',
+  14: 'SPIKED BALLS SPIN ON CHAINS. TIME YOUR MOVE.',
+  18: 'LIGHTS OUT. GEMS AND VENTS GLOW IN THE DARK.',
+  24: 'ANGLERFISH HUNT IN THE DARK. DASH THEM!',
+  25: 'SHARKS CHARGE ONCE THEY SPOT YOU. STAY OUT OF SIGHT.',
+  31: 'THE HEAT RISES. RIDE THE VENTS.',
+  43: 'THE MIDNIGHT ZONE. ONLY YOUR LAMP CAN SAVE YOU.',
+  50: 'THE LEVIATHAN AWAKENS! EVERY GEM YOU TAKE STUNS IT.',
+};
+
+// ---------- shared UI helpers ----------
+export function panel(ctx, x, y, w, h, fill = '#0b1430', border = '#3aaee0') {
+  x = Math.round(x); y = Math.round(y);
+  ctx.fillStyle = '#0b0e1c'; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  ctx.fillStyle = border; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = fill; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x + 1, y + 1, w - 2, 1);
+}
+
+class Menu {
+  constructor(game, items) { this.game = game; this.items = items; this.sel = 0; this.rects = []; }
+  update(input) {
+    const n = this.items.length;
+    if (input.hit('ArrowUp') || input.hit('KeyW')) { this.sel = (this.sel + n - 1) % n; this.game.audio.play('click'); }
+    if (input.hit('ArrowDown') || input.hit('KeyS')) { this.sel = (this.sel + 1) % n; this.game.audio.play('click'); }
+    if (input.confirm()) { this.game.audio.play('select'); this.items[this.sel].act(); return; }
+    for (const tp of input.taps)
+      this.rects.forEach((r, i) => {
+        if (tp.x >= r.x && tp.x <= r.x + r.w && tp.y >= r.y && tp.y <= r.y + r.h) { this.sel = i; this.game.audio.play('select'); this.items[i].act(); }
+      });
+  }
+  draw(ctx, cx, y, w = 120, h = 15, gap = 4, t = 0) {
+    this.rects = [];
+    this.items.forEach((it, i) => {
+      const x = Math.round(cx - w / 2), yy = y + i * (h + gap);
+      const on = i === this.sel;
+      panel(ctx, x, yy, w, h, on ? '#1a3a6a' : '#0b1430', on ? '#ffd23f' : '#3aaee0');
+      drawText(ctx, typeof it.label === 'function' ? it.label() : it.label, cx, yy + Math.floor((h - 5) / 2), on ? '#ffd23f' : '#d8f4ff', { align: 'center' });
+      if (on && (t >> 4) % 2) drawText(ctx, '>', x + 5, yy + Math.floor((h - 5) / 2), '#ffd23f');
+      this.rects.push({ x, y: yy, w, h });
+    });
+  }
+}
+
+// animated underwater backdrop for menus
+function backdrop(ctx, v, t, S, B = BIOME[0]) {
+  const g = ctx.createLinearGradient(0, 0, 0, v.h);
+  g.addColorStop(0, B.water[0]); g.addColorStop(1, B.water[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, v.w, v.h);
+  ctx.save(); ctx.globalAlpha = 0.1; ctx.fillStyle = '#fff';
+  for (let i = 0; i < 5; i++) {
+    const bx = ((i * 83 + Math.sin(t * 0.005 + i) * 20) % (v.w + 120)) - 60;
+    ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx + 14, 0); ctx.lineTo(bx + 80, v.h); ctx.lineTo(bx + 46, v.h); ctx.fill();
+  }
+  ctx.restore();
+  // fish school
+  for (let i = 0; i < 6; i++) {
+    const dir = i % 2 ? 1 : -1, sp = 0.25 + hash(i, 4) * 0.3;
+    let x = (hash(i, 1) * 600 + t * sp * dir) % (v.w + 40);
+    if (x < 0) x += v.w + 40;
+    x -= 20;
+    const y = 40 + hash(i, 2) * (v.h - 110) + Math.sin(t * 0.03 + i) * 3;
+    ctx.drawImage((dir > 0 ? S.fish : S.fishL)[(t >> 3) % 2], Math.round(x), Math.round(y));
+  }
+  // bubbles
+  ctx.fillStyle = 'rgba(220,245,255,0.6)';
+  for (let i = 0; i < 24; i++) {
+    const x = hash(i, 7) * v.w + Math.sin(t * 0.03 + i) * 3;
+    const y = v.h - ((t * (0.3 + hash(i, 8) * 0.5) + hash(i, 9) * v.h) % (v.h + 10));
+    ctx.fillRect(Math.round(x), Math.round(y), 1 + (i % 3 === 0), 1 + (i % 3 === 0));
+  }
+  // sea floor
+  for (let x = 0; x < v.w; x++) {
+    const h = 14 + Math.round(Math.sin(x * 0.05) * 4 + Math.sin(x * 0.13) * 2);
+    ctx.fillStyle = B.edge; ctx.fillRect(x, v.h - h - 1, 1, h + 1);
+    ctx.fillStyle = B.surf[1]; ctx.fillRect(x, v.h - h, 1, 3);
+    ctx.fillStyle = B.surf[0]; ctx.fillRect(x, v.h - h, 1, 1);
+    ctx.fillStyle = hash(x, 3) < 0.2 ? B.rock[3] : B.rock[1]; ctx.fillRect(x, v.h - h + 3, 1, h - 3);
+  }
+  for (let i = 0; i < v.w / 14; i++) {
+    const x = Math.round(hash(i, 11) * v.w), base = v.h - 14 - Math.round(Math.sin(x * 0.05) * 4);
+    const n = 4 + Math.round(hash(i, 12) * 8);
+    for (let k = 0; k < n; k++) px(ctx, x + Math.round(Math.sin(t * 0.03 + i + k * 0.4) * k * 0.25), base - k * 2, k % 3 ? B.weed[0] : B.weed[1], 1, 2);
+  }
+}
+
+// ---------- TITLE ----------
+export class TitleScene {
+  constructor(game) {
+    this.game = game; this.t = 0;
+    this.S = buildSprites(BIOME[0]);
+    const s = game.save;
+    this.menu = new Menu(game, [
+      { label: () => (s.unlocked > 1 ? `CONTINUE  LV ${Math.min(s.unlocked, LEVELS.length)}` : 'START DIVE'), act: () => game.play(Math.min(s.unlocked, LEVELS.length)) },
+      { label: 'SELECT LEVEL', act: () => game.setScene(new SelectScene(game)) },
+      { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; writeSave(s); } },
+      { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); writeSave(s); } },
+    ]);
+    game.input.mode = 'menu';
+    game.audio.music(8);
+  }
+  update(input) { this.t++; this.menu.update(input); }
+  draw(ctx) {
+    const v = this.game.view, t = this.t;
+    backdrop(ctx, v, t, this.S);
+    const ty = Math.max(18, Math.round(v.h / 2 - 150));
+    drawText(ctx, 'ABYSS', v.w / 2, ty, '#ffd23f', { scale: 4, align: 'center', outline: '#0b0e1c', wave: t * 0.08 });
+    drawText(ctx, 'DIVER', v.w / 2, ty + 26, '#8ae8ff', { scale: 4, align: 'center', outline: '#0b0e1c', wave: t * 0.08 + 2 });
+    // hero
+    const hy = ty + 62 + Math.round(Math.sin(t * 0.05) * 3);
+    ctx.drawImage(this.S.player, 0, 0, 16, 16, Math.round(v.w / 2 - 16), hy, 32, 32);
+    if (t % 20 === 0) this.bub = (this.bub || []).concat([{ x: v.w / 2 + (Math.random() * 10 - 5), y: hy + 30, l: 80 }]);
+    this.bub = (this.bub || []).filter((b) => (b.y -= 0.5, b.l--, b.l > 0));
+    for (const b of this.bub) px(ctx, b.x + Math.sin(b.l * 0.2), b.y, 'rgba(220,245,255,0.8)', 2, 2);
+    const my = Math.min(v.h - 100, hy + 46);
+    this.menu.draw(ctx, v.w / 2, my, 132, 15, 4, t);
+    const s = this.game.save;
+    const stars = Object.values(s.best).reduce((a, b) => a + (b.stars || 0), 0);
+    drawText(ctx, `STARS ${stars}/${LEVELS.length * 3}`, 4, v.h - 8, '#fff3a0', { outline: '#0b0e1c' });
+    drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
+  }
+}
+
+// ---------- LEVEL SELECT ----------
+export class SelectScene {
+  constructor(game) {
+    this.game = game; this.t = 0;
+    this.S = buildSprites(BIOME[0]);
+    this.sel = Math.min(game.save.unlocked, LEVELS.length) - 1;
+    this.page = Math.floor(this.sel / 25);
+    this.rects = [];
+    game.input.mode = 'menu';
+  }
+  update(input) {
+    this.t++;
+    const g = this.game, max = Math.min(g.save.unlocked, LEVELS.length);
+    const mv = (d) => { this.sel = Math.max(0, Math.min(LEVELS.length - 1, this.sel + d)); this.page = Math.floor(this.sel / 25); g.audio.play('click'); };
+    if (input.hit('ArrowLeft') || input.hit('KeyA')) mv(-1);
+    if (input.hit('ArrowRight') || input.hit('KeyD')) mv(1);
+    if (input.hit('ArrowUp') || input.hit('KeyW')) mv(-5);
+    if (input.hit('ArrowDown') || input.hit('KeyS')) mv(5);
+    if (input.back()) { g.audio.play('click'); g.setScene(new TitleScene(g)); return; }
+    if (input.confirm()) {
+      if (this.sel < max) { g.audio.play('select'); g.play(this.sel + 1); } else g.audio.play('bounce');
+      return;
+    }
+    for (const tp of input.taps)
+      for (const r of this.rects)
+        if (tp.x >= r.x && tp.x <= r.x + r.w && tp.y >= r.y && tp.y <= r.y + r.h) {
+          if (r.act === 'prev') { this.page = Math.max(0, this.page - 1); this.sel = this.page * 25; g.audio.play('click'); }
+          else if (r.act === 'next') { this.page = Math.min(1, this.page + 1); this.sel = this.page * 25; g.audio.play('click'); }
+          else if (r.act === 'back') { g.audio.play('click'); g.setScene(new TitleScene(g)); }
+          else if (r.id < max) { g.audio.play('select'); g.play(r.id + 1); }
+          else g.audio.play('bounce');
+          return;
+        }
+  }
+  draw(ctx) {
+    const v = this.game.view, t = this.t, s = this.game.save;
+    const L = LEVELS[this.sel];
+    backdrop(ctx, v, t, this.S, BIOME[L.biome]);
+    ctx.fillStyle = 'rgba(5,8,20,0.45)'; ctx.fillRect(0, 0, v.w, v.h);
+    drawText(ctx, 'SELECT LEVEL', v.w / 2, 8, '#ffd23f', { scale: 2, align: 'center', outline: '#0b0e1c' });
+    this.rects = [];
+    const cell = 30, gap = 4, gw = cell * 5 + gap * 4;
+    const x0 = Math.round(v.w / 2 - gw / 2), y0 = 30;
+    for (let i = 0; i < 25; i++) {
+      const id = this.page * 25 + i;
+      const Lv = LEVELS[id];
+      const x = x0 + (i % 5) * (cell + gap), y = y0 + Math.floor(i / 5) * (cell + gap);
+      const locked = id >= s.unlocked;
+      const B = BIOME[Lv.biome];
+      const on = id === this.sel;
+      panel(ctx, x, y, cell, cell, locked ? '#141828' : mix(B.water[0], B.water[1], 0.4), on ? '#ffd23f' : locked ? '#2a3040' : B.surf[0]);
+      if (locked) ctx.drawImage(this.S.lock, x + cell / 2 - 2, y + 8);
+      else {
+        drawText(ctx, String(id + 1), x + cell / 2, y + 6, on ? '#ffd23f' : '#ffffff', { scale: 2, align: 'center', outline: '#0b0e1c' });
+        const st = (s.best[id + 1] || {}).stars || 0;
+        for (let k = 0; k < 3; k++) {
+          const sx = x + 6 + k * 7, sy = y + cell - 8;
+          const c = k < st ? '#ffd23f' : '#3a4058';
+          px(ctx, sx + 1, sy, c, 1, 1); px(ctx, sx, sy + 1, c, 3, 1); px(ctx, sx, sy + 2, c, 1, 1); px(ctx, sx + 2, sy + 2, c, 1, 1);
+        }
+      }
+      if (on && (t >> 4) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 2, y - 2, 3, 1); ctx.fillRect(x - 2, y - 2, 1, 3); ctx.fillRect(x + cell - 1, y + cell + 1, 3, 1); ctx.fillRect(x + cell + 1, y + cell - 1, 1, 3); }
+      this.rects.push({ x, y, w: cell, h: cell, id });
+    }
+    const iy = y0 + 5 * (cell + gap) + 2;
+    panel(ctx, x0, iy, gw, 30, '#0b1430', BIOME[L.biome].surf[0]);
+    drawText(ctx, `${L.id}. ${L.name}`, v.w / 2, iy + 5, '#ffffff', { align: 'center' });
+    drawText(ctx, BIOME[L.biome].name, v.w / 2, iy + 13, BIOME[L.biome].ui, { align: 'center' });
+    const best = s.best[L.id];
+    drawText(ctx, L.id > s.unlocked ? 'LOCKED' : best ? `BEST ${best.score}` : 'NEW!', v.w / 2, iy + 21, '#9aa4b8', { align: 'center' });
+    const by = Math.min(v.h - 20, iy + 38);
+    const btn = (label, x, w, act) => { panel(ctx, x, by, w, 15); drawText(ctx, label, x + w / 2, by + 5, '#d8f4ff', { align: 'center' }); this.rects.push({ x, y: by, w, h: 15, act }); };
+    btn('<', x0, 24, 'prev');
+    btn('BACK', v.w / 2 - 28, 56, 'back');
+    btn('>', x0 + gw - 24, 24, 'next');
+    drawText(ctx, `PAGE ${this.page + 1}/2`, v.w / 2, by + 20, '#9aa4b8', { align: 'center' });
+  }
+}
+
+// ---------- PLAY ----------
+export class PlayScene {
+  constructor(game, id) {
+    this.game = game; this.id = id; this.spec = LEVELS[id - 1];
+    this.world = null; this.t = 0; this.mode = 'load';
+    game.input.mode = 'play';
+    this.pauseMenu = new Menu(game, [
+      { label: 'RESUME', act: () => { this.mode = 'play'; } },
+      { label: 'RESTART', act: () => game.play(id) },
+      { label: () => `SOUND  ${game.save.sound ? 'ON' : 'OFF'}`, act: () => { game.save.sound = !game.save.sound; game.audio.sfxOn = game.save.sound; writeSave(game.save); } },
+      { label: () => `MUSIC  ${game.save.music ? 'ON' : 'OFF'}`, act: () => { game.save.music = !game.save.music; game.audio.setMusic(game.save.music); writeSave(game.save); } },
+      { label: 'LEVEL SELECT', act: () => game.setScene(new SelectScene(game)) },
+    ]);
+  }
+
+  build() {
+    this.world = new World(this.spec, this.game);
+    this.world.snapCam();
+    this.mode = 'intro'; this.t = 0;
+    this.game.audio.music(this.spec.biome);
+  }
+
+  update(input) {
+    this.t++;
+    const g = this.game;
+    if (this.mode === 'load') { if (this.t > 1) this.build(); return; }
+    const W = this.world;
+    if (this.mode === 'intro') {
+      input.mode = 'play';
+      const a = input.axis();
+      W.updateFx(); W.updateCam(false);
+      if (this.t > 30 && (Math.abs(a.x) + Math.abs(a.y) > 0.3 || input.dash() || input.confirm())) this.mode = 'play';
+      else if (this.t > 170) this.mode = 'play';
+      input.dash();
+      return;
+    }
+    if (this.mode === 'pause') {
+      input.mode = 'menu';
+      if (input.back()) { this.mode = 'play'; return; }
+      this.pauseMenu.update(input);
+      if (this.mode === 'play') input.mode = 'play';
+      return;
+    }
+    if (this.mode === 'play') {
+      input.mode = 'play';
+      if (input.back() || input.hit('KeyP')) { this.mode = 'pause'; input.mode = 'menu'; input.stick = null; this.pauseMenu.sel = 0; g.audio.play('click'); return; }
+      const r = W.update(input);
+      if (r === 'won') this.onWin();
+      if (r === 'lost') {
+        this.mode = 'lost'; this.t = 0; input.mode = 'menu';
+        this.endMenu = new Menu(g, [
+          { label: 'TRY AGAIN', act: () => g.play(this.id) },
+          { label: 'LEVEL SELECT', act: () => g.setScene(new SelectScene(g)) },
+        ]);
+      }
+      return;
+    }
+    if (this.mode === 'won' || this.mode === 'lost') {
+      input.mode = 'menu';
+      W.updateFx();
+      if (this.t > 30) this.endMenu.update(input);
+    }
+  }
+
+  onWin() {
+    const g = this.game, s = g.save, W = this.world, R = W.result;
+    const prev = s.best[this.id] || { score: 0, stars: 0 };
+    this.newBest = R.total > prev.score;
+    s.best[this.id] = { score: Math.max(prev.score, R.total), stars: Math.max(prev.stars, R.stars) };
+    if (s.unlocked < this.id + 1) s.unlocked = Math.min(LEVELS.length + 1, this.id + 1);
+    writeSave(s);
+    this.mode = 'won'; this.t = 0; g.input.mode = 'menu';
+    const last = this.id >= LEVELS.length;
+    this.endMenu = new Menu(g, [
+      last ? { label: 'THE END', act: () => g.setScene(new EndScene(g)) } : { label: 'NEXT LEVEL', act: () => g.play(this.id + 1) },
+      { label: 'REPLAY', act: () => g.play(this.id) },
+      { label: 'LEVEL SELECT', act: () => g.setScene(new SelectScene(g)) },
+    ]);
+  }
+
+  drawHUD(ctx) {
+    const v = this.game.view, W = this.world, S = W.S, t = this.t;
+    ctx.fillStyle = 'rgba(5,8,20,0.55)'; ctx.fillRect(0, 0, v.w, 11);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, 11, v.w, 1);
+    ctx.drawImage(S.gemS, 3, 2);
+    drawText(ctx, String(W.gemsLeft).padStart(2, '0'), 12, 3, W.gemsLeft === 0 ? '#7affe0' : '#ffd23f');
+    ctx.drawImage(S.chestS, 24, 3);
+    drawText(ctx, `${W.chestsGot}`, 33, 3, '#ffd23f');
+    drawText(ctx, String(W.score).padStart(5, '0'), v.w / 2, 3, '#ffd23f', { align: 'center' });
+    const pr = { x: v.w - 12, y: 1, w: 10, h: 9 };
+    this.game.input.pauseRect = pr;
+    panel(ctx, pr.x, pr.y, pr.w, pr.h, '#0b1430', '#3aaee0');
+    px(ctx, pr.x + 3, pr.y + 2, '#d8f4ff', 1, 5); px(ctx, pr.x + 6, pr.y + 2, '#d8f4ff', 1, 5);
+    for (let i = 0; i < 3; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 40 + i * 9, 3);
+    // oxygen bar
+    const low = W.o2 < 0.25;
+    const bw = 44;
+    drawText(ctx, 'O2', 3, 14, low && (t >> 3) % 2 ? '#ff6060' : '#8ae8ff', { outline: '#0b0e1c' });
+    ctx.fillStyle = '#0b0e1c'; ctx.fillRect(12, 14, bw + 2, 5);
+    ctx.fillStyle = '#1a2440'; ctx.fillRect(13, 15, bw, 3);
+    ctx.fillStyle = low ? ((t >> 3) % 2 ? '#ff4d4d' : '#b3202e') : W.o2 < 0.5 ? '#ffd23f' : '#8ae8ff';
+    ctx.fillRect(13, 15, Math.round(bw * W.o2), 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(13, 15, Math.round(bw * W.o2), 1);
+    let kx = 62;
+    for (const c of W.held) { ctx.drawImage(S.keys[c], kx, 14); kx += 13; }
+    drawText(ctx, `LV${this.id}`, v.w - 3, 14, '#9aa4b8', { align: 'right', outline: '#0b0e1c' });
+    // dash cooldown + touch controls
+    const inp = this.game.input;
+    if (inp.touchUI && this.mode === 'play') {
+      if (inp.stick) {
+        disc(ctx, inp.stick.ox, inp.stick.oy, 22, 'rgba(255,255,255,0.12)');
+        disc(ctx, inp.stick.ox, inp.stick.oy, 20, 'rgba(10,20,40,0.25)');
+        const dx = inp.stick.x - inp.stick.ox, dy = inp.stick.y - inp.stick.oy, d = Math.hypot(dx, dy), m = Math.min(d, 20) / (d || 1);
+        disc(ctx, inp.stick.ox + dx * m, inp.stick.oy + dy * m, 8, 'rgba(255,255,255,0.4)');
+      } else {
+        drawText(ctx, 'MOVE', 28, v.h - 22, 'rgba(255,255,255,0.35)', { align: 'center' });
+        disc(ctx, 28, v.h - 30, 14, 'rgba(255,255,255,0.08)');
+      }
+      const bx = v.w - 30, by = v.h - 32, cd = W.player.dashCD;
+      disc(ctx, bx, by, 17, 'rgba(11,14,28,0.5)');
+      disc(ctx, bx, by, 15, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd > 0 ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');
+      drawText(ctx, 'DASH', bx, by - 2, '#ffffff', { align: 'center' });
+    }
+  }
+
+  draw(ctx) {
+    const v = this.game.view, t = this.t;
+    if (!this.world) {
+      ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, v.w, v.h);
+      drawText(ctx, 'DIVING...', v.w / 2, v.h / 2 - 2, '#8ae8ff', { align: 'center', scale: 2 });
+      return;
+    }
+    const W = this.world;
+    W.draw(ctx);
+    this.drawHUD(ctx);
+    const B = BIOME[this.spec.biome];
+    if (this.mode === 'intro') {
+      const a = Math.min(1, (170 - this.t) / 20);
+      ctx.globalAlpha = Math.max(0, a);
+      const tip = TIPS[this.id];
+      const lines = tip ? wrap(tip, v.w - 40) : [];
+      const h = 50 + lines.length * 8;
+      const y = Math.round(v.h / 2 - h / 2);
+      panel(ctx, 12, y, v.w - 24, h, 'rgba(8,14,34,0.92)', B.surf[0]);
+      drawText(ctx, `LEVEL ${this.id}`, v.w / 2, y + 6, B.ui, { align: 'center' });
+      drawText(ctx, this.spec.name, v.w / 2, y + 15, '#ffffff', { align: 'center', scale: 2, outline: '#0b0e1c' });
+      drawText(ctx, `${B.name}  -  ${this.spec.gems} GEMS`, v.w / 2, y + 31, '#9aa4b8', { align: 'center' });
+      lines.forEach((l, i) => drawText(ctx, l, v.w / 2, y + 42 + i * 8, '#fff3a0', { align: 'center' }));
+      ctx.globalAlpha = 1;
+    }
+    if (this.mode === 'pause') {
+      ctx.fillStyle = 'rgba(3,5,14,0.7)'; ctx.fillRect(0, 0, v.w, v.h);
+      drawText(ctx, 'PAUSED', v.w / 2, v.h / 2 - 70, '#ffd23f', { align: 'center', scale: 3, outline: '#0b0e1c' });
+      this.pauseMenu.draw(ctx, v.w / 2, v.h / 2 - 40, 120, 15, 4, t);
+    }
+    if (this.mode === 'lost') {
+      ctx.fillStyle = `rgba(20,0,6,${Math.min(0.75, this.t / 40)})`; ctx.fillRect(0, 0, v.w, v.h);
+      drawText(ctx, 'OUT OF', v.w / 2, v.h / 2 - 60, '#ff6060', { align: 'center', scale: 3, outline: '#0b0e1c' });
+      drawText(ctx, 'LIVES', v.w / 2, v.h / 2 - 38, '#ff6060', { align: 'center', scale: 3, outline: '#0b0e1c' });
+      if (this.t > 30) this.endMenu.draw(ctx, v.w / 2, v.h / 2, 120, 15, 4, t);
+    }
+    if (this.mode === 'won') this.drawWin(ctx);
+  }
+
+  drawWin(ctx) {
+    const v = this.game.view, t = this.t, R = this.world.result, S = this.world.S;
+    ctx.fillStyle = `rgba(3,8,20,${Math.min(0.78, t / 30)})`; ctx.fillRect(0, 0, v.w, v.h);
+    const y = Math.max(16, Math.round(v.h / 2 - 110));
+    drawText(ctx, 'LEVEL CLEAR!', v.w / 2, y, '#7affe0', { align: 'center', scale: 2, outline: '#0b0e1c', wave: t * 0.1 });
+    for (let k = 0; k < 3; k++) {
+      const show = t > 20 + k * 14;
+      const img = show && k < R.stars ? S.star : S.starE;
+      if (show && t === 21 + k * 14 && k < R.stars) this.game.audio.play('gem');
+      ctx.drawImage(img, 0, 0, 7, 7, Math.round(v.w / 2 - 33 + k * 23), y + 18, 21, 21);
+    }
+    const rows = [
+      ['SCORE', R.score], ['TIME BONUS', R.timeBonus], ['HEART BONUS', R.heartBonus],
+      ['TREASURE', `${R.chests}/${R.chestsMax}`], ['TIME', `${Math.floor(R.secs / 60)}:${String(Math.floor(R.secs % 60)).padStart(2, '0')}`],
+    ];
+    const px0 = Math.round(v.w / 2 - 60);
+    panel(ctx, px0, y + 46, 120, 62, 'rgba(8,14,34,0.9)', '#3aaee0');
+    rows.forEach(([a, b], i) => {
+      if (t < 50 + i * 6) return;
+      drawText(ctx, a, px0 + 6, y + 52 + i * 9, '#9aa4b8');
+      drawText(ctx, String(b), px0 + 114, y + 52 + i * 9, '#ffffff', { align: 'right' });
+    });
+    if (t > 85) {
+      drawText(ctx, `TOTAL ${R.total}`, v.w / 2, y + 114, '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
+      if (this.newBest && (t >> 4) % 2) drawText(ctx, 'NEW BEST!', v.w / 2, y + 128, '#ff8ad8', { align: 'center' });
+    }
+    if (t > 30) this.endMenu.draw(ctx, v.w / 2, y + 140, 120, 15, 4, t);
+  }
+}
+
+// ---------- ENDING ----------
+export class EndScene {
+  constructor(game) { this.game = game; this.t = 0; this.S = buildSprites(BIOME[7]); game.input.mode = 'menu'; game.audio.music(8); }
+  update(input) {
+    this.t++;
+    if (this.t > 90 && (input.confirm() || input.taps.length || input.back())) this.game.setScene(new TitleScene(this.game));
+  }
+  draw(ctx) {
+    const v = this.game.view, t = this.t, s = this.game.save;
+    backdrop(ctx, v, t, this.S, BIOME[7]);
+    const total = Object.values(s.best).reduce((a, b) => a + (b.score || 0), 0);
+    const stars = Object.values(s.best).reduce((a, b) => a + (b.stars || 0), 0);
+    drawText(ctx, 'THE ABYSS', v.w / 2, v.h / 2 - 70, '#3af0ff', { align: 'center', scale: 3, outline: '#0b0e1c', wave: t * 0.06 });
+    drawText(ctx, 'IS CONQUERED!', v.w / 2, v.h / 2 - 46, '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
+    drawText(ctx, `TOTAL SCORE ${total}`, v.w / 2, v.h / 2 - 16, '#ffffff', { align: 'center' });
+    drawText(ctx, `STARS ${stars}/${LEVELS.length * 3}`, v.w / 2, v.h / 2 - 6, '#fff3a0', { align: 'center' });
+    ctx.drawImage(this.S.player, 0, 0, 16, 16, Math.round(v.w / 2 - 16), Math.round(v.h / 2 + 8 + Math.sin(t * 0.05) * 3), 32, 32);
+    if (t > 90 && (t >> 4) % 2) drawText(ctx, 'TAP TO CONTINUE', v.w / 2, v.h / 2 + 52, '#d8f4ff', { align: 'center' });
+  }
+}
+
