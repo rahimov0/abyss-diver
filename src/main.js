@@ -32,6 +32,7 @@ class Game {
   resize() {
     const dpr = window.devicePixelRatio || 1;
     const vw = window.innerWidth, vh = window.innerHeight;
+    if (vw < 10 || vh < 10) return; // hidden / not laid out yet; the next resize event fixes it
     const pw = vw * dpr, ph = vh * dpr;
     let s = Math.max(1, Math.floor(Math.min(pw, ph) / 192));
     let W = Math.ceil(pw / s), H = Math.ceil(ph / s);
