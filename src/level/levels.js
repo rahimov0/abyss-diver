@@ -85,7 +85,7 @@ export const LEVELS = RAW.map(([name, biome, arch, w, h, gems, o], i) => {
     speed: 1 + d * 0.65,
     o2: Math.round(95 - d * 50), // seconds per full tank
     airR: Math.round(30 - d * 8),
-    current: +(0.045 + d * 0.025).toFixed(3),
+    current: +(0.042 + d * 0.016).toFixed(3),
     seed: 1000 + (i + 1) * 7717,
   };
 });

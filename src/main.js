@@ -19,6 +19,9 @@ class Game {
     this.resize();
     addEventListener('resize', () => this.resize());
     this.scene = new TitleScene(this);
+    // Phone back gesture / browser back button: pause -> main menu instead of leaving the site
+    try { history.replaceState({ s: 'root' }, ''); } catch { /* ignore */ }
+    addEventListener('popstate', () => this.onBack());
     // dev / testing hook: #level=N jumps straight into a level
     const m = location.hash.match(/level=(\d+)/);
     if (m) this.play(Math.max(1, Math.min(LEVELS.length, +m[1])));
@@ -44,7 +47,23 @@ class Game {
     this.ctx.imageSmoothingEnabled = false;
   }
 
-  setScene(s) { this.scene = s; this.input.stick = null; this.input.dashTouch = null; }
+  setScene(s) {
+    this.scene = s;
+    this.input.stick = null; this.input.dashTouch = null;
+    if (!(s instanceof TitleScene)) this.pushBackGuard();
+  }
+
+  pushBackGuard() {
+    try { if (!history.state || history.state.s !== 'game') history.pushState({ s: 'game' }, ''); } catch { /* ignore */ }
+  }
+
+  onBack() {
+    const sc = this.scene;
+    if (sc instanceof TitleScene) return; // back from the menu leaves normally next time
+    if (sc instanceof PlayScene && sc.world && sc.pause()) { this.pushBackGuard(); return; }
+    this.scene = new TitleScene(this);
+    this.input.stick = null; this.input.dashTouch = null;
+  }
   play(id) { this.setScene(new PlayScene(this, id)); }
 
   frame(now) {

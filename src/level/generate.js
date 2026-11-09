@@ -341,6 +341,11 @@ function tryGenerate(spec, seed, relax) {
         zone = { tx: ha, ty: y0, tw: hb - ha + 1, th: y1 - y0 + 1, fx: 0, fy: rng.chance(0.5) ? fmag : -fmag };
       }
       if (!zone) continue;
+      // never put a current right next to a breakable wall or a gate
+      let nearSpecial = false;
+      for (let yy = zone.ty - 2; yy < zone.ty + zone.th + 2 && !nearSpecial; yy++)
+        for (let xx = zone.tx - 2; xx < zone.tx + zone.tw + 2; xx++) { const tt = g.get(xx, yy); if (tt !== T.WATER && tt !== T.ROCK) { nearSpecial = true; break; } }
+      if (nearSpecial) continue;
       const overl = currents.some((c) => zone.tx < c.tx + c.tw + 2 && c.tx < zone.tx + zone.tw + 2 && zone.ty < c.ty + c.th + 2 && c.ty < zone.ty + zone.th + 2);
       if (overl) continue;
       if (sp.x >= zone.tx - 1 && sp.x <= zone.tx + zone.tw && sp.y >= zone.ty - 1 && sp.y <= zone.ty + zone.th) continue;
@@ -361,7 +366,8 @@ function tryGenerate(spec, seed, relax) {
       if (vents.length >= spec.vents) break;
       if (vents.some((v) => Math.abs(v.tx - x) < 4 && Math.abs(v.ty - y) < 8)) continue;
       if (nearSpawn(x, y, 4)) continue;
-      vents.push({ tx: x, ty: y, top: va, x: px(x), y: (y + 1) * TILE, h: (y + 1 - va) * TILE });
+      const top = Math.max(va, y - 8); // geysers are local lifts, never a whole shaft
+      vents.push({ tx: x, ty: y, top, x: px(x), y: (y + 1) * TILE, h: (y + 1 - top) * TILE });
     }
   }
 

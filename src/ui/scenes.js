@@ -7,7 +7,7 @@ import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.0';
+export const VERSION = 'V3.1';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL!',
@@ -196,15 +196,11 @@ export class SelectScene {
       const B = BIOME[Lv.biome];
       const on = id === this.sel;
       panel(ctx, x, y, cell, cell, locked ? '#141828' : mix(B.water[0], B.water[1], 0.4), on ? '#ffd23f' : locked ? '#2a3040' : B.surf[0]);
-      if (locked) ctx.drawImage(this.S.lock, x + cell / 2 - 2, y + 8);
+      if (locked) ctx.drawImage(this.S.lock, 0, 0, 5, 6, x + cell / 2 - 5, y + cell / 2 - 6, 10, 12);
       else {
         drawText(ctx, String(id + 1), x + cell / 2, y + 6, on ? '#ffd23f' : '#ffffff', { scale: 2, align: 'center', outline: '#0b0e1c' });
         const st = (s.best[id + 1] || {}).stars || 0;
-        for (let k = 0; k < 3; k++) {
-          const sx = x + 6 + k * 7, sy = y + cell - 8;
-          const c = k < st ? '#ffd23f' : '#3a4058';
-          px(ctx, sx + 1, sy, c, 1, 1); px(ctx, sx, sy + 1, c, 3, 1); px(ctx, sx, sy + 2, c, 1, 1); px(ctx, sx + 2, sy + 2, c, 1, 1);
-        }
+        for (let k = 0; k < 3; k++) ctx.drawImage(k < st ? this.S.star : this.S.starE, x + 4 + k * 8, y + cell - 9);
       }
       if (on && (t >> 4) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 2, y - 2, 3, 1); ctx.fillRect(x - 2, y - 2, 1, 3); ctx.fillRect(x + cell - 1, y + cell + 1, 3, 1); ctx.fillRect(x + cell + 1, y + cell - 1, 1, 3); }
       this.rects.push({ x, y, w: cell, h: cell, id });
@@ -236,7 +232,18 @@ export class PlayScene {
       { label: () => `SOUND  ${game.save.sound ? 'ON' : 'OFF'}`, act: () => { game.save.sound = !game.save.sound; game.audio.sfxOn = game.save.sound; writeSave(game.save); } },
       { label: () => `MUSIC  ${game.save.music ? 'ON' : 'OFF'}`, act: () => { game.save.music = !game.save.music; game.audio.setMusic(game.save.music); writeSave(game.save); } },
       { label: 'LEVEL SELECT', act: () => game.setScene(new SelectScene(game)) },
+      { label: 'MAIN MENU', act: () => game.setScene(new TitleScene(game)) },
     ]);
+  }
+
+  pause() {
+    if (this.mode !== 'play' && this.mode !== 'intro') return false;
+    this.mode = 'pause';
+    const i = this.game.input;
+    i.mode = 'menu'; i.stick = null; i.dashTouch = null;
+    this.pauseMenu.sel = 0;
+    this.game.audio.play('click');
+    return true;
   }
 
   build() {
@@ -253,6 +260,7 @@ export class PlayScene {
     const W = this.world;
     if (this.mode === 'intro') {
       input.mode = 'play';
+      if (input.back() || input.hit('KeyP')) { this.pause(); return; }
       const a = input.axis();
       W.updateFx(); W.updateCam(false);
       if (this.t > 30 && (Math.abs(a.x) + Math.abs(a.y) > 0.3 || input.dash() || input.confirm())) this.mode = 'play';
@@ -269,7 +277,7 @@ export class PlayScene {
     }
     if (this.mode === 'play') {
       input.mode = 'play';
-      if (input.back() || input.hit('KeyP')) { this.mode = 'pause'; input.mode = 'menu'; input.stick = null; this.pauseMenu.sel = 0; g.audio.play('click'); return; }
+      if (input.back() || input.hit('KeyP')) { this.pause(); return; }
       const r = W.update(input);
       if (r === 'won') this.onWin();
       if (r === 'lost') {
@@ -277,6 +285,7 @@ export class PlayScene {
         this.endMenu = new Menu(g, [
           { label: 'TRY AGAIN', act: () => g.play(this.id) },
           { label: 'LEVEL SELECT', act: () => g.setScene(new SelectScene(g)) },
+          { label: 'MAIN MENU', act: () => g.setScene(new TitleScene(g)) },
         ]);
       }
       return;
@@ -301,6 +310,7 @@ export class PlayScene {
       last ? { label: 'THE END', act: () => g.setScene(new EndScene(g)) } : { label: 'NEXT LEVEL', act: () => g.play(this.id + 1) },
       { label: 'REPLAY', act: () => g.play(this.id) },
       { label: 'LEVEL SELECT', act: () => g.setScene(new SelectScene(g)) },
+      { label: 'MAIN MENU', act: () => g.setScene(new TitleScene(g)) },
     ]);
   }
 
@@ -313,11 +323,11 @@ export class PlayScene {
     ctx.drawImage(S.chestS, 24, 3);
     drawText(ctx, `${W.chestsGot}`, 33, 3, '#ffd23f');
     drawText(ctx, String(W.score).padStart(5, '0'), v.w / 2, 3, '#ffd23f', { align: 'center' });
-    const pr = { x: v.w - 12, y: 1, w: 10, h: 9 };
+    const pr = { x: v.w - 15, y: 1, w: 14, h: 13 };
     this.game.input.pauseRect = pr;
-    panel(ctx, pr.x, pr.y, pr.w, pr.h, '#0b1430', '#3aaee0');
-    px(ctx, pr.x + 3, pr.y + 2, '#d8f4ff', 1, 5); px(ctx, pr.x + 6, pr.y + 2, '#d8f4ff', 1, 5);
-    for (let i = 0; i < 3; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 40 + i * 9, 3);
+    panel(ctx, pr.x, pr.y, pr.w, pr.h, '#0b1430', '#ffd23f');
+    px(ctx, pr.x + 4, pr.y + 3, '#ffffff', 2, 7); px(ctx, pr.x + 8, pr.y + 3, '#ffffff', 2, 7);
+    for (let i = 0; i < 3; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 44 + i * 9, 3);
     // oxygen bar
     const low = W.o2 < 0.25;
     const bw = 44;
@@ -329,7 +339,7 @@ export class PlayScene {
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(13, 15, Math.round(bw * W.o2), 1);
     let kx = 62;
     for (const c of W.held) { ctx.drawImage(S.keys[c], kx, 14); kx += 13; }
-    drawText(ctx, `LV${this.id}`, v.w - 3, 14, '#9aa4b8', { align: 'right', outline: '#0b0e1c' });
+    drawText(ctx, `LV${this.id}`, v.w - 3, 17, '#9aa4b8', { align: 'right', outline: '#0b0e1c' });
     // dash cooldown + touch controls
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
@@ -414,7 +424,8 @@ export class PlayScene {
       drawText(ctx, `TOTAL ${R.total}`, v.w / 2, y + 114, '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
       if (this.newBest && (t >> 4) % 2) drawText(ctx, 'NEW BEST!', v.w / 2, y + 128, '#ff8ad8', { align: 'center' });
     }
-    if (t > 30) this.endMenu.draw(ctx, v.w / 2, y + 140, 120, 15, 4, t);
+    const my = Math.min(y + 140, v.h - this.endMenu.items.length * 19 - 2);
+    if (t > 30) this.endMenu.draw(ctx, v.w / 2, my, 120, 15, 4, t);
   }
 }
 
