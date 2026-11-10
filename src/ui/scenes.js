@@ -7,7 +7,7 @@ import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.5';
+export const VERSION = 'V3.6';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -420,15 +420,17 @@ export class PlayScene {
     // dash cooldown + touch controls
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
+      // fixed joystick in the bottom-left corner
+      const b = inp.stickBase();
+      disc(ctx, b.x, b.y, b.r + 1, 'rgba(11,14,28,0.45)');
+      disc(ctx, b.x, b.y, b.r - 1, inp.stick ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)');
+      let kx = b.x, ky = b.y;
       if (inp.stick) {
-        disc(ctx, inp.stick.ox, inp.stick.oy, 22, 'rgba(255,255,255,0.12)');
-        disc(ctx, inp.stick.ox, inp.stick.oy, 20, 'rgba(10,20,40,0.25)');
-        const dx = inp.stick.x - inp.stick.ox, dy = inp.stick.y - inp.stick.oy, d = Math.hypot(dx, dy), m = Math.min(d, 20) / (d || 1);
-        disc(ctx, inp.stick.ox + dx * m, inp.stick.oy + dy * m, 8, 'rgba(255,255,255,0.4)');
-      } else {
-        drawText(ctx, 'MOVE', 28, v.h - 22, 'rgba(255,255,255,0.35)', { align: 'center' });
-        disc(ctx, 28, v.h - 30, 14, 'rgba(255,255,255,0.08)');
-      }
+        const dx = inp.stick.x - b.x, dy = inp.stick.y - b.y, d = Math.hypot(dx, dy), m = Math.min(d, b.r - 6) / (d || 1);
+        kx += dx * m; ky += dy * m;
+      } else drawText(ctx, 'MOVE', b.x, b.y + b.r + 3 > v.h - 6 ? b.y - b.r - 8 : b.y + b.r + 3, 'rgba(255,255,255,0.35)', { align: 'center' });
+      disc(ctx, kx, ky, 9, 'rgba(11,14,28,0.5)');
+      disc(ctx, kx, ky, 8, inp.stick ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)');
       const bx = v.w - 30, by = v.h - 32, cd = W.player.dashCD;
       disc(ctx, bx, by, 17, 'rgba(11,14,28,0.5)');
       disc(ctx, bx, by, 15, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd > 0 ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');

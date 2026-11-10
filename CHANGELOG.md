@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.6
+- Touch joystick is now fixed in the bottom-left corner (it no longer follows the finger around); always visible during play.
+
 ## v3.5
 - iOS home-screen app also blurs the strip under the status bar: the HUD offset now applies there too.
 

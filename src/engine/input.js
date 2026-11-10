@@ -1,4 +1,4 @@
-// Keyboard + touch input. Touch: left side = floating joystick, right side = DASH, taps for menus.
+// Keyboard + touch input. Touch: left side = fixed joystick (bottom-left), right side = DASH, taps for menus.
 export class Input {
   constructor(canvas, screen) {
     this.canvas = canvas;
@@ -43,7 +43,8 @@ export class Input {
       for (const h of this.hot)
         if (p.x >= h.x - 4 && p.x <= h.x + h.w + 4 && p.y >= h.y - 4 && p.y <= h.y + h.h + 4) { this.pressed.add(h.code); return; }
       if (p.x < this.screen.w * 0.5) {
-        if (!this.stick) this.stick = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
+        // fixed joystick: direction is always measured from the same base point
+        if (!this.stick) { const b = this.stickBase(); this.stick = { id: e.pointerId, ox: b.x, oy: b.y, x: p.x, y: p.y }; }
       } else {
         this.dashTouch = { id: e.pointerId, x: p.x, y: p.y };
         this.dashQueued = true;
@@ -57,9 +58,6 @@ export class Input {
     if (this.stick && e.pointerId === this.stick.id) {
       const p = this.toLocal(e);
       this.stick.x = p.x; this.stick.y = p.y;
-      // drag the origin along if finger travels too far (floating stick)
-      const dx = p.x - this.stick.ox, dy = p.y - this.stick.oy, d = Math.hypot(dx, dy), max = 26;
-      if (d > max) { this.stick.ox = p.x - (dx / d) * max; this.stick.oy = p.y - (dy / d) * max; }
     }
   }
 
@@ -67,6 +65,8 @@ export class Input {
     if (this.stick && e.pointerId === this.stick.id) this.stick = null;
     if (this.dashTouch && e.pointerId === this.dashTouch.id) this.dashTouch = null;
   }
+
+  stickBase() { return { x: 36, y: this.screen.h - 40, r: 24 }; }
 
   axis() {
     let x = 0, y = 0;
@@ -78,8 +78,8 @@ export class Input {
     if (this.stick) {
       const dx = this.stick.x - this.stick.ox, dy = this.stick.y - this.stick.oy;
       const d = Math.hypot(dx, dy);
-      if (d > 4) {
-        const m = Math.min(1, (d - 4) / 18);
+      if (d > 3) {
+        const m = Math.min(1, (d - 3) / 15);
         x = (dx / d) * m; y = (dy / d) * m;
       }
     }
