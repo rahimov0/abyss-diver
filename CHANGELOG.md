@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.2
+- Phone mode: on small screens the camera is closer (bigger pixels, bigger text and buttons); tablets/desktop unchanged.
+- The game now stays inside the phone's safe area — HUD (oxygen, score, pause) is no longer hidden under the notch / status bar, and nothing sits under the home bar.
+- Pinch-zoom and double-tap zoom are blocked during play (iOS ignores the viewport setting).
+- Level select grid adapts to narrow screens.
+
 ## v3.1
 - Phone back gesture / browser back button now pauses the game, a second back returns to the main menu (no more page refresh needed).
 - "MAIN MENU" added to the pause, level-clear and game-over menus; bigger pause button.

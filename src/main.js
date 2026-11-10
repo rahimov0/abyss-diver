@@ -16,8 +16,13 @@ class Game {
     this.input = new Input(canvas, this.view);
     this.input.onGesture = () => this.audio.unlock();
     addEventListener('keydown', () => this.audio.unlock());
+    this.wrap = canvas.parentElement;
     this.resize();
-    addEventListener('resize', () => this.resize());
+    const rs = () => { this.resize(); setTimeout(() => this.resize(), 250); };
+    addEventListener('resize', rs);
+    addEventListener('orientationchange', rs);
+    if (window.visualViewport) visualViewport.addEventListener('resize', rs);
+    blockZoom(canvas);
     this.scene = new TitleScene(this);
     // Phone back gesture / browser back button: pause -> main menu instead of leaving the site
     try { history.replaceState({ s: 'root' }, ''); } catch { /* ignore */ }
@@ -34,15 +39,22 @@ class Game {
 
   resize() {
     const dpr = window.devicePixelRatio || 1;
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const r = this.wrap.getBoundingClientRect();
+    const vw = r.width, vh = r.height;
     if (vw < 10 || vh < 10) return; // hidden / not laid out yet; the next resize event fixes it
     const pw = vw * dpr, ph = vh * dpr;
-    let s = Math.max(1, Math.floor(Math.min(pw, ph) / 192));
-    let W = Math.ceil(pw / s), H = Math.ceil(ph / s);
-    while (W > 440 || H > 540) { s++; W = Math.ceil(pw / s); H = Math.ceil(ph / s); }
+    // phone mode: small screens get a closer view (bigger pixels); tablets/desktop see more of the cave
+    const phone = Math.min(vw, vh) < 520;
+    const m = Math.min(pw, ph);
+    let s = Math.max(1, phone ? Math.round(m / 170) : Math.floor(m / 192));
+    let W = Math.floor(pw / s), H = Math.floor(ph / s);
+    while (W > 440 || H > 540) { s++; W = Math.floor(pw / s); H = Math.floor(ph / s); }
     this.canvas.width = W; this.canvas.height = H;
-    this.canvas.style.width = `${(W * s) / dpr}px`;
-    this.canvas.style.height = `${(H * s) / dpr}px`;
+    const cw = (W * s) / dpr, ch = (H * s) / dpr;
+    this.canvas.style.width = `${cw}px`;
+    this.canvas.style.height = `${ch}px`;
+    this.canvas.style.left = `${Math.floor((vw - cw) / 2)}px`;
+    this.canvas.style.top = `${Math.floor((vh - ch) / 2)}px`;
     this.view.w = W; this.view.h = H;
     this.ctx.imageSmoothingEnabled = false;
   }
@@ -81,6 +93,16 @@ class Game {
     try { this.scene.draw(this.ctx); } catch (e) { console.error(e); }
     requestAnimationFrame((t) => this.frame(t));
   }
+}
+
+// iOS ignores user-scalable=no: block pinch / double-tap zoom ourselves
+function blockZoom(canvas) {
+  const stop = (e) => e.preventDefault();
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick']) document.addEventListener(ev, stop, { passive: false });
+  document.addEventListener('touchmove', stop, { passive: false });
+  canvas.addEventListener('touchstart', stop, { passive: false });
+  let last = 0;
+  document.addEventListener('touchend', (e) => { const n = Date.now(); if (n - last < 350) e.preventDefault(); last = n; }, { passive: false });
 }
 
 window.game = new Game(document.getElementById('game'));

@@ -7,7 +7,7 @@ import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.1';
+export const VERSION = 'V3.2';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL!',
@@ -186,7 +186,7 @@ export class SelectScene {
     ctx.fillStyle = 'rgba(5,8,20,0.45)'; ctx.fillRect(0, 0, v.w, v.h);
     drawText(ctx, 'SELECT LEVEL', v.w / 2, 8, '#ffd23f', { scale: 2, align: 'center', outline: '#0b0e1c' });
     this.rects = [];
-    const cell = 30, gap = 4, gw = cell * 5 + gap * 4;
+    const gap = 4, cell = Math.min(30, Math.floor((v.w - 8 - gap * 4) / 5)), gw = cell * 5 + gap * 4;
     const x0 = Math.round(v.w / 2 - gw / 2), y0 = 30;
     for (let i = 0; i < 25; i++) {
       const id = this.page * 25 + i;
@@ -200,7 +200,7 @@ export class SelectScene {
       else {
         drawText(ctx, String(id + 1), x + cell / 2, y + 6, on ? '#ffd23f' : '#ffffff', { scale: 2, align: 'center', outline: '#0b0e1c' });
         const st = (s.best[id + 1] || {}).stars || 0;
-        for (let k = 0; k < 3; k++) ctx.drawImage(k < st ? this.S.star : this.S.starE, x + 4 + k * 8, y + cell - 9);
+        for (let k = 0; k < 3; k++) ctx.drawImage(k < st ? this.S.star : this.S.starE, x + Math.floor((cell - 23) / 2) + k * 8, y + cell - 9);
       }
       if (on && (t >> 4) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 2, y - 2, 3, 1); ctx.fillRect(x - 2, y - 2, 1, 3); ctx.fillRect(x + cell - 1, y + cell + 1, 3, 1); ctx.fillRect(x + cell + 1, y + cell - 1, 1, 3); }
       this.rects.push({ x, y, w: cell, h: cell, id });
