@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.8
+- ARROWS control: four big separate buttons; each finger presses exactly one direction (two fingers for diagonals).
+- Level select: tapping a level only selects it, a big PLAY button starts it; swipe to turn pages; landscape layout.
+- Menus register taps on release, so dragging never triggers a button by accident.
+- Checkpoint flags on long levels (placed at run time on the main route — level layouts untouched): touch a flag and, if you run out of hearts, you continue from it with full hearts.
+- Vibration on hits, explosions and breaking rock (Android; setting VIBRATION ON/OFF).
+- Diver types unlocked with stars: BUBBLE, TURTLE (15★, 4 hearts), SHARKY (40★, fast dash recharge), LANTERN (75★, bigger light + more air), GOLDEN (120★, faster swim & dash).
+- Compact title screen in landscape.
+
 ## v3.7
 - SETTINGS menu (title screen + pause): controls (fixed JOYSTICK / ARROW buttons / SWIPE), VIEW (NORMAL / WIDE / CLOSE), mini map on/off, sound, music.
 - VIEW WIDE shows much more of the cave, especially in portrait.

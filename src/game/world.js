@@ -1,5 +1,6 @@
 // Runtime of one level: player physics, pickups, enemies, effects and rendering.
-import { T, TILE } from '../level/grid.js';
+import { T, TILE, Grid, bfs } from '../level/grid.js';
+import { currentDiver } from './divers.js';
 import { generateLevel } from '../level/generate.js';
 import { BIOME } from '../gfx/biomes.js';
 import { buildSprites } from '../gfx/sprites.js';
@@ -17,7 +18,8 @@ export class World {
     this.spec = spec; this.game = game;
     const L = (this.L = generateLevel(spec));
     this.biome = spec.biome; this.B = BIOME[spec.biome];
-    this.S = buildSprites(this.B);
+    this.diver = currentDiver(game.save);
+    this.S = buildSprites(this.B, this.diver.pal);
     this.tiles = new Uint8Array(L.tiles);
     this.tileCanvas = renderTiles(L, this.B);
     this.far = renderFar(L, this.B, spec.id * 13);
@@ -36,7 +38,9 @@ export class World {
     this.shots = []; this.parts = []; this.popups = [];
     this.held = new Set();
     this.score = 0; this.gemsLeft = this.gems.length; this.chestsGot = 0;
-    this.hearts = 3; this.damaged = false; this.o2 = 1; this.lowBeep = 0;
+    this.maxHearts = this.diver.hearts || 3;
+    this.hearts = this.maxHearts; this.damaged = false; this.o2 = 1; this.lowBeep = 0;
+    this.flags = this.placeFlags(); this.checkpoint = null;
     this.time = 0; this.shake = 0; this.state = 'play'; this.stateT = 0; this.flashT = 0;
     this.cam = { x: 0, y: 0 };
     this.darkC = null;
@@ -81,6 +85,56 @@ export class World {
   }
   mapTileChanged(i) { if (this.seen[i]) { this.mapPixel(i); this.mapDirty = true; } }
 
+  // ---------- checkpoints & vibration ----------
+  buzz(ms) {
+    if (this.game.save.vibrate === false) return;
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch { /* unsupported */ }
+  }
+
+  // Checkpoint flags are placed at run time on the existing main route (the level itself is untouched).
+  placeFlags() {
+    const L = this.L, g = new Grid(L.w, L.h);
+    g.t = L.tiles;
+    const r = bfs(g, [{ x: L.spawn.tx, y: L.spawn.ty }], (t) => t !== T.ROCK);
+    const path = [];
+    for (let i = L.exit.ty * L.w + L.exit.tx; i !== -1 && path.length < 5000; i = r.parent[i]) path.push(i);
+    path.reverse();
+    const n = path.length;
+    if (n < 70) return [];
+    const count = n >= 170 ? 2 : 1;
+    const things = [...L.gems, ...L.keys, ...L.chests, ...L.air];
+    const flags = [];
+    for (let k = 1; k <= count; k++) {
+      const mid = Math.floor((n * k) / (count + 1));
+      let pick = null;
+      for (let j = 0; j < n / 3 && !pick; j++)
+        for (const s of [1, -1]) {
+          const i = path[mid + j * s];
+          if (i === undefined) continue;
+          let x = i % L.w, y = (i / L.w) | 0;
+          for (let d = 0; d < 10 && g.get(x, y + 1) === T.WATER; d++) y++; // settle onto the floor
+          if (g.get(x, y) !== T.WATER || g.get(x, y + 1) === T.WATER || g.get(x, y - 1) !== T.WATER) continue;
+          if (things.some((q) => Math.hypot(q.tx - x, q.ty - y) < 2.5)) continue;
+          if (L.enemies.some((e) => Math.hypot(e.tx - x, e.ty - y) < 3)) continue;
+          pick = { tx: x, ty: y, x: x * TILE + 8, y: (y + 1) * TILE, on: false };
+          break;
+        }
+      if (pick) flags.push(pick);
+    }
+    return flags;
+  }
+
+  respawn() {
+    const p = this.player, c = this.checkpoint;
+    p.x = c.x; p.y = c.y; p.vx = 0; p.vy = 0; p.dead = false; p.dashT = 0; p.inv = 150;
+    this.hearts = this.maxHearts; this.o2 = 1; this.shots = [];
+    this.state = 'play'; this.stateT = 0;
+    this.snapCam();
+    this.game.audio.music(this.spec.biome);
+    this.popup('BACK TO CHECKPOINT', p.x, p.y - 18, '#5dff7a');
+    this.burst(p.x, p.y, 'bubble', 14);
+  }
+
   // ---------- queries ----------
   tileAt(tx, ty) { return tx < 0 || ty < 0 || tx >= this.L.w || ty >= this.L.h ? T.ROCK : this.tiles[ty * this.L.w + tx]; }
   solidAt(x, y) { return this.tileAt(Math.floor(x / TILE), Math.floor(y / TILE)) !== T.WATER; }
@@ -112,7 +166,7 @@ export class World {
     const a = Math.atan2(p.y - sy, p.x - sx);
     p.vx = Math.cos(a) * 3.6; p.vy = Math.sin(a) * 3.6; p.dashT = 0;
     this.shake = 9; this.flashT = 8;
-    this.sfx('hurt');
+    this.sfx('hurt'); this.buzz(70);
     this.burst(p.x, p.y, 'bubble', 12);
     if (this.hearts <= 0) { p.dead = true; this.state = 'dying'; this.stateT = 0; this.sfx('lose'); this.game.audio.music(-1); }
   }
@@ -129,7 +183,7 @@ export class World {
       this.burst(x * TILE + 8, y * TILE + 8, 'debris', 4, this.B.rock[3]);
       stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
     }
-    if (n) { this.sfx('break'); this.shake = 6; this.addScore(50); }
+    if (n) { this.sfx('break'); this.shake = 6; this.addScore(50); this.buzz(25); }
   }
 
   openDoor(c) {
@@ -201,7 +255,7 @@ export class World {
       const m = Math.hypot(dx, dy);
       if (m < 0.2) { dx = p.face; dy = 0; } else { dx /= m; dy /= m; }
       p.vx = dx * PHYS.DASH_V; p.vy = dy * PHYS.DASH_V;
-      p.dashT = PHYS.DASH_T; p.dashCD = PHYS.DASH_CD;
+      p.dashT = PHYS.DASH_T; p.dashCD = Math.round(PHYS.DASH_CD * (this.diver.dashCD || 1));
       this.sfx('dash');
       for (let i = 0; i < 6; i++) this.bubble(p.x - dx * 6, p.y - dy * 6, 0.5);
     }
@@ -209,15 +263,17 @@ export class World {
       p.dashT--;
       if (this.time % 2 === 0) this.parts.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 12, max: 12, type: 'ghost', face: p.face });
     } else {
-      p.vx += a.x * PHYS.ACC;
-      p.vy += a.y < 0 ? a.y * PHYS.THRUST : a.y * PHYS.DIVE;
+      const spd = this.diver.speed || 1;
+      p.vx += a.x * PHYS.ACC * spd;
+      p.vy += a.y < 0 ? a.y * PHYS.THRUST * spd : a.y * PHYS.DIVE * spd;
       p.vy += PHYS.G;
       // environment
       for (const c of this.currents) if (p.x > c.x && p.x < c.x + c.w && p.y > c.y && p.y < c.y + c.h) { p.vx += c.fx; p.vy += c.fy; }
       for (const v of this.vents) if (Math.abs(p.x - v.x) < 12 && p.y < v.y && p.y > v.y - v.h) p.vy -= 0.09;
       p.vx *= PHYS.DRAG; p.vy *= PHYS.DRAG;
       const sp = Math.hypot(p.vx, p.vy);
-      if (sp > PHYS.MAX) { const k = Math.max(PHYS.MAX / sp, 0.92); p.vx *= k; p.vy *= k; }
+      const MAX = PHYS.MAX * spd;
+      if (sp > MAX) { const k = Math.max(MAX / sp, 0.92); p.vx *= k; p.vy *= k; }
       if (a.y < -0.3 && this.time % 5 === 0) this.bubble(p.x + rnd(-3, 3), p.y + 7, 0.6);
     }
     if (Math.abs(a.x) > 0.2) p.face = a.x < 0 ? -1 : 1;
@@ -245,7 +301,7 @@ export class World {
 
     if (this.state === 'play') {
       // oxygen
-      this.o2 -= 1 / (this.spec.o2 * 60);
+      this.o2 -= 1 / (this.spec.o2 * (this.diver.o2 || 1) * 60);
       let refill = false;
       for (const a of this.air) {
         a.t++;
@@ -274,6 +330,13 @@ export class World {
         this.burst(k.x, k.y, 'spark', 12, this.S.keyCols[k.c][0]);
         this.popup('KEY FOUND!', k.x, k.y - 18, this.S.keyCols[k.c][0]);
       }
+      for (const f of this.flags) if (!f.on && Math.hypot(p.x - f.x, p.y - (f.y - 8)) < 15) {
+        for (const o of this.flags) o.on = false;
+        f.on = true; this.checkpoint = { x: f.x, y: f.y - 10 };
+        this.sfx('key'); this.buzz(40);
+        this.popup('CHECKPOINT!', f.x, f.y - 26, '#5dff7a');
+        this.burst(f.x, f.y - 12, 'spark', 12, '#5dff7a');
+      }
       for (const c of this.chests) if (!c.got && Math.hypot(p.x - c.x, p.y - c.y) < 12) {
         c.got = true; this.chestsGot++; this.addScore(500, c.x, c.y); this.sfx('chest');
         this.burst(c.x, c.y, 'spark', 18, '#ffd23f'); this.popup('TREASURE!', c.x, c.y - 18, '#ffd23f');
@@ -296,7 +359,7 @@ export class World {
           e.alive = false; this.addScore(150, e.x, e.y); this.sfx('kill'); this.shake = 4;
           this.burst(e.x, e.y, 'spark', 12, '#ffffff'); this.burst(e.x, e.y, 'bubble', 8);
         } else if (e.type === 'mine') {
-          e.alive = false; this.sfx('boom'); this.shake = 12;
+          e.alive = false; this.sfx('boom'); this.shake = 12; this.buzz(140);
           this.burst(e.x, e.y, 'fire', 20, '#ffb040'); this.burst(e.x, e.y, 'bubble', 14);
           this.hurt(e.x, e.y);
         } else if (e.harmful) this.hurt(e.x, e.y);
@@ -321,7 +384,10 @@ export class World {
     }
     this.updateFx();
     this.updateCam(false);
-    if (this.state === 'dying' && this.stateT > 110) return 'lost';
+    if (this.state === 'dying' && this.stateT > 110) {
+      if (this.checkpoint) { this.respawn(); return null; }
+      return 'lost';
+    }
     return null;
   }
 
@@ -334,7 +400,7 @@ export class World {
   finish() {
     const secs = this.time / 60;
     const timeBonus = Math.max(0, Math.round(3000 - secs * 12));
-    const heartBonus = this.hearts * 300;
+    const heartBonus = Math.min(3, this.hearts) * 300;
     this.result = {
       score: this.score, timeBonus, heartBonus, total: this.score + timeBonus + heartBonus,
       secs, chests: this.chestsGot, chestsMax: this.chests.length, damaged: this.damaged,
@@ -445,6 +511,18 @@ export class World {
       ellipse(ctx, vt.x, vt.y, 7, 3, '#0b0e1c'); ellipse(ctx, vt.x, vt.y, 6, 2, B.rock[2]); ellipse(ctx, vt.x, vt.y - 1, 3, 1, this.biome === 5 ? '#ff7a1a' : '#0b0e1c');
       ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(vt.x - 6, vt.y - vt.h, 12, vt.h);
     }
+    // checkpoint flags
+    for (const f of this.flags) if (vis(f.x, f.y)) {
+      const x = Math.round(f.x), y = Math.round(f.y);
+      ctx.fillStyle = '#0b0e1c'; ctx.fillRect(x - 1, y - 18, 3, 18);
+      ctx.fillStyle = '#c8d0e0'; ctx.fillRect(x, y - 17, 1, 17);
+      ellipse(ctx, x, y, 4, 1.5, '#5d6478');
+      const wave = Math.round(Math.sin(t * 0.12 + x) * 1.2);
+      const col = f.on ? '#5dff7a' : '#9aa4b8', dark = f.on ? '#19b84a' : '#5d6478';
+      tri(ctx, x + 1, y - 17, x + 1, y - 9, x + 10, y - 13 + wave, '#0b0e1c');
+      tri(ctx, x + 2, y - 16, x + 2, y - 10, x + 9, y - 13 + wave, col);
+      px(ctx, x + 2, y - 11, dark, 3, 1);
+    }
     // air sources
     for (const a of this.air) if (vis(a.x, a.y)) {
       const y = a.y + 6;
@@ -502,6 +580,16 @@ export class World {
     if (this.flashT > 0) { ctx.fillStyle = `rgba(255,40,40,${this.flashT / 30})`; ctx.fillRect(0, 0, v.w, v.h); }
   }
 
+  drawAccessory(ctx, x, y, f, t) {
+    switch (this.diver.acc) {
+      case 'fin': tri(ctx, x - f * 4, y - 6, x + f * 2, y - 6, x - f * 4, y - 13, '#0b0e1c'); tri(ctx, x - f * 3, y - 7, x + f, y - 7, x - f * 3, y - 11, '#8a96aa'); break;
+      case 'lamp': ctx.fillStyle = '#0b0e1c'; ctx.fillRect(x - 1, y - 12, 3, 5); ctx.fillStyle = '#5d6478'; ctx.fillRect(x, y - 11, 1, 4); disc(ctx, x, y - 13, 2, (t >> 4) % 2 ? '#fff3a0' : '#ffffff'); break;
+      case 'crown': ctx.fillStyle = '#0b0e1c'; ctx.fillRect(x - 5, y - 11, 11, 4); ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 4, y - 10, 9, 2); ctx.fillRect(x - 4, y - 12, 1, 2); ctx.fillRect(x, y - 13, 1, 3); ctx.fillRect(x + 4, y - 12, 1, 2); px(ctx, x, y - 10, '#ff4d4d'); break;
+      case 'shell': for (const [dx, dy] of [[-4, 2], [-1, 4], [2, 2], [-3, -1]]) px(ctx, x - f * dx, y + dy, '#1f6a3a', 2, 1); break;
+      default:
+    }
+  }
+
   drawPlayer(ctx, t) {
     const p = this.player;
     if (this.state === 'won') {
@@ -523,6 +611,7 @@ export class World {
       return;
     }
     ctx.drawImage(p.face < 0 ? this.S.playerL : this.S.player, x - 8, y - 8);
+    this.drawAccessory(ctx, x, y, p.face, t);
     if (p.dashT > 0) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x - 6, y - 7, 2, 2); }
   }
 
@@ -554,7 +643,8 @@ export class World {
     d.fillStyle = 'rgba(2,3,12,0.93)'; d.fillRect(0, 0, v.w, v.h);
     d.globalCompositeOperation = 'destination-out';
     const p = this.player;
-    const lights = [{ x: p.x, y: p.y, r: 34 + this.spec.dark * 110 + Math.sin(this.time * 0.05) * 3, a: 1 }];
+    const lights = [{ x: p.x, y: p.y, r: (34 + this.spec.dark * 110) * (this.diver.light || 1) + Math.sin(this.time * 0.05) * 3, a: 1 }];
+    for (const f of this.flags) lights.push({ x: f.x, y: f.y - 8, r: 18, a: 0.6 });
     for (const g of this.gems) if (!g.got) lights.push({ x: g.x, y: g.y, r: 16, a: 0.7 });
     for (const k of this.keys) if (!k.got) lights.push({ x: k.x, y: k.y, r: 16, a: 0.7 });
     for (const a of this.air) lights.push({ x: a.x, y: a.y, r: 14, a: 0.6 });

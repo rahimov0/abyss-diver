@@ -137,7 +137,7 @@ export function recolor(rows, map) {
   return rows.map((r) => r.replace(/./g, (ch) => map[ch] || ch));
 }
 
-export function buildSprites(B) {
+export function buildSprites(B, diverPal = {}) {
   const pal = { ...PAL };
   const fishPal = { ...pal, y: B.fish[0], Y: B.fish[1] };
   const fish1 = sprite(FISH, fishPal);
@@ -149,7 +149,7 @@ export function buildSprites(B) {
   const fish2 = sprite(fish2rows, fishPal);
   const keyCols = [['#ff4d4d', '#b3202e'], ['#4da6ff', '#1f5f9e'], ['#5dff7a', '#19b84a']];
   const S = {
-    player: sprite(PLAYER, pal),
+    player: sprite(PLAYER, { ...pal, ...diverPal }),
     gem: sprite(GEM, pal), gemS: sprite(GEM_S, pal),
     chest: sprite(CHEST, pal), chestS: sprite(CHEST_S, pal),
     keys: keyCols.map(([a, b]) => sprite(KEY, { ...pal, y: a, Y: b })),

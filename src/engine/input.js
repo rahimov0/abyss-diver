@@ -13,6 +13,9 @@ export class Input {
     this.dashTouch = null;
     this.dashQueued = false;
     this.hot = []; // [{x,y,w,h,code}] tappable HUD buttons during play
+    this.pads = new Map(); // dpad: pointerId -> 'up'|'down'|'left'|'right'|null
+    this.swipes = []; // menu swipes [{dx, dy}]
+    this.menuPtr = new Map(); // menu pointers: id -> {sx, sy, x, y}
 
     addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
@@ -20,7 +23,7 @@ export class Input {
       this.keys.add(e.code);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
-    addEventListener('blur', () => { this.keys.clear(); this.stick = null; this.dashTouch = null; });
+    addEventListener('blur', () => { this.keys.clear(); this.clearTouches(); });
 
     const opts = { passive: false };
     canvas.addEventListener('pointerdown', (e) => this.down(e), opts);
@@ -44,6 +47,7 @@ export class Input {
       for (const h of this.hot)
         if (p.x >= h.x - 4 && p.x <= h.x + h.w + 4 && p.y >= h.y - 4 && p.y <= h.y + h.h + 4) { this.pressed.add(h.code); return; }
       if (p.x < this.screen.w * 0.5) {
+        if (this.ctrl === 'dpad') { this.pads.set(e.pointerId, this.padAt(p)); return; }
         // fixed joystick: direction is always measured from the same base point
         if (!this.stick) {
           const b = this.ctrl === 'swipe' ? p : this.stickBase();
@@ -55,10 +59,14 @@ export class Input {
       }
       return;
     }
-    this.taps.push(p);
+    // menus: a tap is registered on release, a drag becomes a swipe (scroll pages without opening things)
+    this.menuPtr.set(e.pointerId, { sx: p.x, sy: p.y, x: p.x, y: p.y });
   }
 
   move(e) {
+    if (this.pads.has(e.pointerId)) this.pads.set(e.pointerId, this.padAt(this.toLocal(e)));
+    const m = this.menuPtr.get(e.pointerId);
+    if (m) { const p = this.toLocal(e); m.x = p.x; m.y = p.y; }
     if (this.stick && e.pointerId === this.stick.id) {
       const p = this.toLocal(e);
       this.stick.x = p.x; this.stick.y = p.y;
@@ -70,11 +78,41 @@ export class Input {
   }
 
   up(e) {
+    this.pads.delete(e.pointerId);
+    const m = this.menuPtr.get(e.pointerId);
+    if (m) {
+      this.menuPtr.delete(e.pointerId);
+      const dx = m.x - m.sx, dy = m.y - m.sy;
+      if (e.type === 'pointerup') {
+        if (Math.hypot(dx, dy) < 10) this.taps.push({ x: m.sx, y: m.sy });
+        else if (Math.max(Math.abs(dx), Math.abs(dy)) > 24) this.swipes.push({ dx, dy });
+      }
+    }
     if (this.stick && e.pointerId === this.stick.id) this.stick = null;
     if (this.dashTouch && e.pointerId === this.dashTouch.id) this.dashTouch = null;
   }
 
   stickBase() { return { x: 36, y: this.screen.h - 40, r: 24 }; }
+
+  // arrow buttons: a cross of four big separate buttons
+  padCenter() { return { x: 46, y: this.screen.h - 50 }; }
+  padButtons() {
+    const c = this.padCenter(), s = 24, g = 25;
+    return {
+      up: { x: c.x - s / 2, y: c.y - g - s / 2, w: s, h: s, dx: 0, dy: -1 },
+      down: { x: c.x - s / 2, y: c.y + g - s / 2, w: s, h: s, dx: 0, dy: 1 },
+      left: { x: c.x - g - s / 2, y: c.y - s / 2, w: s, h: s, dx: -1, dy: 0 },
+      right: { x: c.x + g - s / 2, y: c.y - s / 2, w: s, h: s, dx: 1, dy: 0 },
+    };
+  }
+  padAt(p) { // only the button under (or nearest to) the finger — one direction per finger
+    let best = null, bd = 30;
+    for (const [k, b] of Object.entries(this.padButtons())) {
+      const d = Math.hypot(p.x - (b.x + b.w / 2), p.y - (b.y + b.h / 2));
+      if (d < bd) { bd = d; best = k; }
+    }
+    return best;
+  }
 
   axis() {
     let x = 0, y = 0;
@@ -83,15 +121,17 @@ export class Input {
     if (k.has('ArrowRight') || k.has('KeyD')) x += 1;
     if (k.has('ArrowUp') || k.has('KeyW')) y -= 1;
     if (k.has('ArrowDown') || k.has('KeyS')) y += 1;
+    if (this.pads.size) {
+      const B = this.padButtons();
+      let px = 0, py = 0;
+      for (const k of this.pads.values()) if (k) { px += B[k].dx; py += B[k].dy; }
+      px = Math.max(-1, Math.min(1, px)); py = Math.max(-1, Math.min(1, py));
+      if (px || py) { const m = Math.hypot(px, py); x = px / m; y = py / m; }
+    }
     if (this.stick) {
       const dx = this.stick.x - this.stick.ox, dy = this.stick.y - this.stick.oy;
       const d = Math.hypot(dx, dy);
-      if (this.ctrl === 'dpad') {
-        if (d > 5) { // 8 directions, full speed
-          const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
-          x = Math.round(Math.cos(a) * 1000) / 1000; y = Math.round(Math.sin(a) * 1000) / 1000;
-        }
-      } else if (d > 3) {
+      if (d > 3) {
         const m = Math.min(1, (d - 3) / 15);
         x = (dx / d) * m; y = (dy / d) * m;
       }
@@ -109,5 +149,7 @@ export class Input {
   confirm() { return this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyZ'); }
   back() { return this.pressed.has('Escape') || this.pressed.has('Backspace'); }
 
-  endFrame() { this.pressed.clear(); this.taps.length = 0; }
+  pressedPads() { return new Set(this.pads.values()); }
+  clearTouches() { this.stick = null; this.dashTouch = null; this.pads.clear(); }
+  endFrame() { this.pressed.clear(); this.taps.length = 0; this.swipes.length = 0; }
 }

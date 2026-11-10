@@ -6,8 +6,9 @@ import { World } from '../game/world.js';
 import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
+import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V3.7';
+export const VERSION = 'V3.8';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -83,6 +84,7 @@ function settingsMenu(game, back) {
     { label: () => `CONTROLS  ${CONTROL_NAMES[s.controls]}`, act: () => { s.controls = cycle(['stick', 'dpad', 'swipe'], s.controls); game.input.ctrl = s.controls; save(); } },
     { label: () => `VIEW  ${VIEW_NAMES[s.view]}`, act: () => { s.view = cycle(['normal', 'wide', 'close'], s.view); save(); game.resize(); } },
     { label: () => `MINI MAP  ${s.minimap ? 'ON' : 'OFF'}`, act: () => { s.minimap = !s.minimap; save(); } },
+    { label: () => `VIBRATION  ${s.vibrate !== false ? 'ON' : 'OFF'}`, act: () => { s.vibrate = s.vibrate === false; save(); if (s.vibrate) try { navigator.vibrate && navigator.vibrate(40); } catch { /* */ } } },
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
     { label: 'BACK', act: back },
@@ -145,11 +147,12 @@ function backdrop(ctx, v, t, S, B = BIOME[0]) {
 export class TitleScene {
   constructor(game) {
     this.game = game; this.t = 0;
-    this.S = buildSprites(BIOME[0]);
+    this.S = buildSprites(BIOME[0], currentDiver(game.save).pal);
     const s = game.save;
     this.menu = new Menu(game, [
       { label: () => (s.unlocked > 1 ? `CONTINUE  LV ${Math.min(s.unlocked, LEVELS.length)}` : 'START DIVE'), act: () => game.play(Math.min(s.unlocked, LEVELS.length)) },
       { label: 'SELECT LEVEL', act: () => game.setScene(new SelectScene(game)) },
+      { label: () => `DIVER  ${currentDiver(s).name}`, act: () => game.setScene(new DiverScene(game)) },
       { label: 'SETTINGS', act: () => { this.mode = 'settings'; this.settings.sel = 0; } },
     ]);
     this.mode = 'main';
@@ -165,22 +168,27 @@ export class TitleScene {
   draw(ctx) {
     const v = this.game.view, t = this.t;
     backdrop(ctx, v, t, this.S);
-    const ty = Math.max(18, Math.round(v.h / 2 - 150));
-    drawText(ctx, 'ABYSS', v.w / 2, ty, '#ffd23f', { scale: 4, align: 'center', outline: '#0b0e1c', wave: t * 0.08 });
-    drawText(ctx, 'DIVER', v.w / 2, ty + 26, '#8ae8ff', { scale: 4, align: 'center', outline: '#0b0e1c', wave: t * 0.08 + 2 });
+    const compact = v.h < 300; // landscape phones
+    const ty = compact ? 6 : Math.max(18, Math.round(v.h / 2 - 150));
+    const ls = compact ? 3 : 4;
+    drawText(ctx, 'ABYSS', v.w / 2, ty, '#ffd23f', { scale: ls, align: 'center', outline: '#0b0e1c', wave: t * 0.08 });
+    drawText(ctx, 'DIVER', v.w / 2, ty + ls * 6 + 2, '#8ae8ff', { scale: ls, align: 'center', outline: '#0b0e1c', wave: t * 0.08 + 2 });
     // hero
-    const hy = ty + 62 + Math.round(Math.sin(t * 0.05) * 3);
-    ctx.drawImage(this.S.player, 0, 0, 16, 16, Math.round(v.w / 2 - 16), hy, 32, 32);
-    if (t % 20 === 0) this.bub = (this.bub || []).concat([{ x: v.w / 2 + (Math.random() * 10 - 5), y: hy + 30, l: 80 }]);
-    this.bub = (this.bub || []).filter((b) => (b.y -= 0.5, b.l--, b.l > 0));
-    for (const b of this.bub) px(ctx, b.x + Math.sin(b.l * 0.2), b.y, 'rgba(220,245,255,0.8)', 2, 2);
+    const hy = compact ? ty + 16 : ty + 62 + Math.round(Math.sin(t * 0.05) * 3);
+    if (compact) ctx.drawImage(this.S.player, 6, 6 + Math.round(Math.sin(t * 0.05) * 2));
+    else {
+      ctx.drawImage(this.S.player, 0, 0, 16, 16, Math.round(v.w / 2 - 16), hy, 32, 32);
+      if (t % 20 === 0) this.bub = (this.bub || []).concat([{ x: v.w / 2 + (Math.random() * 10 - 5), y: hy + 30, l: 80 }]);
+      this.bub = (this.bub || []).filter((b) => (b.y -= 0.5, b.l--, b.l > 0));
+      for (const b of this.bub) px(ctx, b.x + Math.sin(b.l * 0.2), b.y, 'rgba(220,245,255,0.8)', 2, 2);
+    }
     if (this.mode === 'settings') {
       ctx.fillStyle = 'rgba(3,5,14,0.75)'; ctx.fillRect(0, 0, v.w, v.h);
       drawSettings(ctx, this.game, this.settings, t);
       drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
       return;
     }
-    const my = Math.min(v.h - 100, hy + 46);
+    const my = compact ? ty + ls * 12 + 8 : Math.min(v.h - 118, hy + 46);
     this.menu.draw(ctx, v.w / 2, my, 132, 15, 4, t);
     const s = this.game.save;
     const stars = Object.values(s.best).reduce((a, b) => a + (b.stars || 0), 0);
@@ -217,16 +225,26 @@ export class SelectScene {
       if (this.sel < max) { g.audio.play('select'); g.play(this.sel + 1); } else g.audio.play('bounce');
       return;
     }
+    // swipe left/right (or up/down) to change page
+    for (const sw of input.swipes) {
+      const fwd = Math.abs(sw.dx) > Math.abs(sw.dy) ? sw.dx < 0 : sw.dy < 0;
+      this.setPage(this.page + (fwd ? 1 : -1));
+    }
     for (const tp of input.taps)
       for (const r of this.rects)
         if (tp.x >= r.x && tp.x <= r.x + r.w && tp.y >= r.y && tp.y <= r.y + r.h) {
-          if (r.act === 'prev') { this.page = Math.max(0, this.page - 1); this.sel = this.page * 25; g.audio.play('click'); }
-          else if (r.act === 'next') { this.page = Math.min(1, this.page + 1); this.sel = this.page * 25; g.audio.play('click'); }
+          if (r.act === 'prev') this.setPage(this.page - 1);
+          else if (r.act === 'next') this.setPage(this.page + 1);
           else if (r.act === 'back') { g.audio.play('click'); g.setScene(new TitleScene(g)); }
-          else if (r.id < max) { g.audio.play('select'); g.play(r.id + 1); }
-          else g.audio.play('bounce');
+          else if (r.act === 'play') { if (this.sel < max) { g.audio.play('select'); g.play(this.sel + 1); } else g.audio.play('bounce'); }
+          else { this.sel = r.id; g.audio.play(r.id < max ? 'click' : 'bounce'); } // tapping a level only selects it
           return;
         }
+  }
+  setPage(p) {
+    const np = Math.max(0, Math.min(1, p));
+    if (np === this.page) return;
+    this.page = np; this.sel = np * 25; this.game.audio.play('click');
   }
   draw(ctx) {
     const v = this.game.view, t = this.t, s = this.game.save;
@@ -235,8 +253,11 @@ export class SelectScene {
     ctx.fillStyle = 'rgba(5,8,20,0.45)'; ctx.fillRect(0, 0, v.w, v.h);
     drawText(ctx, 'SELECT LEVEL', v.w / 2, 8, '#ffd23f', { scale: 2, align: 'center', outline: '#0b0e1c' });
     this.rects = [];
-    const gap = 4, cell = Math.min(30, Math.floor((v.w - 8 - gap * 4) / 5)), gw = cell * 5 + gap * 4;
-    const x0 = Math.round(v.w / 2 - gw / 2), y0 = 30;
+    const land = v.w > v.h * 1.25; // landscape: grid on the left, details on the right
+    const gap = 4;
+    const cell = land ? Math.min(30, Math.floor((v.h - 32 - gap * 4) / 5)) : Math.min(30, Math.floor((v.w - 8 - gap * 4) / 5));
+    const gw = cell * 5 + gap * 4;
+    const x0 = land ? Math.max(6, Math.round(v.w / 2 - gw - 8)) : Math.round(v.w / 2 - gw / 2), y0 = 28;
     for (let i = 0; i < 25; i++) {
       const id = this.page * 25 + i;
       const Lv = LEVELS[id];
@@ -247,25 +268,95 @@ export class SelectScene {
       panel(ctx, x, y, cell, cell, locked ? '#141828' : mix(B.water[0], B.water[1], 0.4), on ? '#ffd23f' : locked ? '#2a3040' : B.surf[0]);
       if (locked) ctx.drawImage(this.S.lock, 0, 0, 5, 6, x + cell / 2 - 5, y + cell / 2 - 6, 10, 12);
       else {
-        drawText(ctx, String(id + 1), x + cell / 2, y + 6, on ? '#ffd23f' : '#ffffff', { scale: 2, align: 'center', outline: '#0b0e1c' });
+        drawText(ctx, String(id + 1), x + cell / 2, y + Math.max(3, Math.floor(cell / 2) - 9), on ? '#ffd23f' : '#ffffff', { scale: 2, align: 'center', outline: '#0b0e1c' });
         const st = (s.best[id + 1] || {}).stars || 0;
         for (let k = 0; k < 3; k++) ctx.drawImage(k < st ? this.S.star : this.S.starE, x + Math.floor((cell - 23) / 2) + k * 8, y + cell - 9);
       }
       if (on && (t >> 4) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 2, y - 2, 3, 1); ctx.fillRect(x - 2, y - 2, 1, 3); ctx.fillRect(x + cell - 1, y + cell + 1, 3, 1); ctx.fillRect(x + cell + 1, y + cell - 1, 1, 3); }
       this.rects.push({ x, y, w: cell, h: cell, id });
     }
-    const iy = y0 + 5 * (cell + gap) + 2;
-    panel(ctx, x0, iy, gw, 30, '#0b1430', BIOME[L.biome].surf[0]);
-    drawText(ctx, `${L.id}. ${L.name}`, v.w / 2, iy + 5, '#ffffff', { align: 'center' });
-    drawText(ctx, BIOME[L.biome].name, v.w / 2, iy + 13, BIOME[L.biome].ui, { align: 'center' });
+    // details column (below the grid in portrait, right of it in landscape)
+    const cx0 = land ? x0 + gw + 12 : x0, cw = land ? Math.min(150, v.w - cx0 - 6) : gw;
+    let iy = land ? y0 : y0 + 5 * (cell + gap) + 2;
+    const mid = cx0 + cw / 2;
+    const locked = L.id > s.unlocked;
+    panel(ctx, cx0, iy, cw, 30, '#0b1430', BIOME[L.biome].surf[0]);
+    drawText(ctx, `${L.id}. ${L.name}`, mid, iy + 5, '#ffffff', { align: 'center' });
+    drawText(ctx, BIOME[L.biome].name, mid, iy + 13, BIOME[L.biome].ui, { align: 'center' });
     const best = s.best[L.id];
-    drawText(ctx, L.id > s.unlocked ? 'LOCKED' : best ? `BEST ${best.score}` : 'NEW!', v.w / 2, iy + 21, '#9aa4b8', { align: 'center' });
-    const by = Math.min(v.h - 20, iy + 38);
+    drawText(ctx, locked ? 'LOCKED' : best ? `BEST ${best.score}` : 'NEW!', mid, iy + 21, '#9aa4b8', { align: 'center' });
+    iy += 34;
+    // big PLAY button — starting a level always needs this press
+    const pw = Math.min(cw, 110);
+    panel(ctx, mid - pw / 2, iy, pw, 19, locked ? '#141828' : (t >> 4) % 2 ? '#3a5a1a' : '#2e4a14', locked ? '#2a3040' : '#7aff5a');
+    drawText(ctx, locked ? 'LOCKED' : `PLAY LEVEL ${L.id}`, mid, iy + 7, locked ? '#5d6478' : '#ffffff', { align: 'center' });
+    this.rects.push({ x: mid - pw / 2, y: iy, w: pw, h: 19, act: 'play' });
+    iy += 25;
+    const by = land ? iy : Math.min(v.h - 26, iy);
     const btn = (label, x, w, act) => { panel(ctx, x, by, w, 15); drawText(ctx, label, x + w / 2, by + 5, '#d8f4ff', { align: 'center' }); this.rects.push({ x, y: by, w, h: 15, act }); };
-    btn('<', x0, 24, 'prev');
-    btn('BACK', v.w / 2 - 28, 56, 'back');
-    btn('>', x0 + gw - 24, 24, 'next');
-    drawText(ctx, `PAGE ${this.page + 1}/2`, v.w / 2, by + 20, '#9aa4b8', { align: 'center' });
+    btn('<', cx0, 24, 'prev');
+    btn('BACK', mid - 28, 56, 'back');
+    btn('>', cx0 + cw - 24, 24, 'next');
+    drawText(ctx, `PAGE ${this.page + 1}/2  -  SWIPE TO TURN`, mid, by + 19, '#9aa4b8', { align: 'center' });
+  }
+}
+
+// ---------- DIVER SELECT ----------
+export class DiverScene {
+  constructor(game) {
+    this.game = game; this.t = 0;
+    this.sprites = DIVERS.map((d) => buildSprites(BIOME[0], d.pal));
+    this.bg = this.sprites[0];
+    this.sel = Math.max(0, DIVERS.findIndex((d) => d.id === currentDiver(game.save).id));
+    this.rects = [];
+    game.input.mode = 'menu';
+  }
+  choose(i) {
+    const g = this.game, d = DIVERS[i], stars = totalStars(g.save);
+    this.sel = i;
+    if (stars < d.stars) { g.audio.play('bounce'); return; }
+    g.save.diver = d.id; writeSave(g.save); g.audio.play('select');
+  }
+  update(input) {
+    this.t++;
+    const g = this.game, n = DIVERS.length;
+    if (input.hit('ArrowUp') || input.hit('KeyW')) { this.sel = (this.sel + n - 1) % n; g.audio.play('click'); }
+    if (input.hit('ArrowDown') || input.hit('KeyS')) { this.sel = (this.sel + 1) % n; g.audio.play('click'); }
+    if (input.confirm()) this.choose(this.sel);
+    if (input.back()) { g.audio.play('click'); g.setScene(new TitleScene(g)); return; }
+    for (const tp of input.taps)
+      for (const r of this.rects)
+        if (tp.x >= r.x && tp.x <= r.x + r.w && tp.y >= r.y && tp.y <= r.y + r.h) {
+          if (r.act === 'back') { g.audio.play('click'); g.setScene(new TitleScene(g)); } else this.choose(r.id);
+          return;
+        }
+  }
+  draw(ctx) {
+    const v = this.game.view, t = this.t, s = this.game.save, stars = totalStars(s);
+    backdrop(ctx, v, t, this.bg);
+    ctx.fillStyle = 'rgba(5,8,20,0.55)'; ctx.fillRect(0, 0, v.w, v.h);
+    drawText(ctx, 'CHOOSE DIVER', v.w / 2, 8, '#ffd23f', { scale: 2, align: 'center', outline: '#0b0e1c' });
+    drawText(ctx, `YOUR STARS: ${stars}`, v.w / 2, 24, '#fff3a0', { align: 'center', outline: '#0b0e1c' });
+    this.rects = [];
+    const rw = Math.min(v.w - 12, 190), x0 = Math.round(v.w / 2 - rw / 2);
+    const rh = Math.max(26, Math.min(36, Math.floor((v.h - 70) / DIVERS.length) - 4));
+    const cur = currentDiver(s).id;
+    DIVERS.forEach((d, i) => {
+      const y = 34 + i * (rh + 4), locked = stars < d.stars, on = i === this.sel, picked = d.id === cur;
+      panel(ctx, x0, y, rw, rh, picked ? '#1a3a6a' : '#0b1430', on ? '#ffd23f' : picked ? '#7affe0' : locked ? '#2a3040' : '#3aaee0');
+      const img = this.sprites[i].player;
+      const sy = y + Math.round(rh / 2) - 8 + (picked ? Math.round(Math.sin(t * 0.08) * 1) : 0);
+      if (locked) { ctx.globalAlpha = 0.35; ctx.drawImage(img, x0 + 6, sy); ctx.globalAlpha = 1; ctx.drawImage(this.sprites[i].lock, x0 + 12, sy + 5); }
+      else ctx.drawImage(img, x0 + 6, sy);
+      drawText(ctx, d.name, x0 + 28, y + Math.round(rh / 2) - 8, locked ? '#5d6478' : picked ? '#7affe0' : '#ffffff');
+      drawText(ctx, locked ? `NEEDS ${d.stars} STARS` : d.perk, x0 + 28, y + Math.round(rh / 2) + 2, locked ? '#5d6478' : '#9aa4b8');
+      if (picked) drawText(ctx, 'ON', x0 + rw - 6, y + Math.round(rh / 2) - 8, '#7affe0', { align: 'right' });
+      this.rects.push({ x: x0, y, w: rw, h: rh, id: i });
+    });
+    const by = Math.min(v.h - 20, 34 + DIVERS.length * (rh + 4) + 4);
+    panel(ctx, v.w / 2 - 28, by, 56, 15);
+    drawText(ctx, 'BACK', v.w / 2, by + 5, '#d8f4ff', { align: 'center' });
+    this.rects.push({ x: v.w / 2 - 28, y: by, w: 56, h: 15, act: 'back' });
   }
 }
 
@@ -291,7 +382,7 @@ export class PlayScene {
     if (this.mode !== 'play' && this.mode !== 'intro' && this.mode !== 'map') return false;
     this.mode = 'pause';
     const i = this.game.input;
-    i.mode = 'menu'; i.stick = null; i.dashTouch = null;
+    i.mode = 'menu'; i.clearTouches();
     this.pauseMenu.sel = 0;
     this.game.audio.play('click');
     return true;
@@ -340,7 +431,7 @@ export class PlayScene {
     if (this.mode === 'play') {
       input.mode = 'play';
       if (input.back() || input.hit('KeyP')) { this.pause(); return; }
-      if (input.hit('KeyM') || input.hit('Tab')) { this.mode = 'map'; this.mapT = this.t; input.mode = 'menu'; input.stick = null; input.dashTouch = null; this.game.audio.play('click'); return; }
+      if (input.hit('KeyM') || input.hit('Tab')) { this.mode = 'map'; this.mapT = this.t; input.mode = 'menu'; input.clearTouches(); this.game.audio.play('click'); return; }
       const r = W.update(input);
       if (r === 'won') this.onWin();
       if (r === 'lost') {
@@ -463,7 +554,7 @@ export class PlayScene {
     const pr = { x: v.w - 15, y: 1, w: 14, h: 13 };
     panel(ctx, pr.x, pr.y, pr.w, pr.h, '#0b1430', '#ffd23f');
     px(ctx, pr.x + 4, pr.y + 3, '#ffffff', 2, 7); px(ctx, pr.x + 8, pr.y + 3, '#ffffff', 2, 7);
-    for (let i = 0; i < 3; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 44 + i * 9, 5);
+    for (let i = 0; i < W.maxHearts; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 17 - (W.maxHearts - i) * 9, 5);
     // oxygen bar
     const low = W.o2 < 0.25;
     const bw = 44;
@@ -481,18 +572,17 @@ export class PlayScene {
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
       const b = inp.stickBase();
-      if (inp.ctrl === 'dpad') { // arrow buttons
-        const ax = inp.axis();
-        const btn = (dx, dy) => {
-          const cx = b.x + dx * 15, cy = b.y + dy * 15;
-          const on = (dx && Math.sign(ax.x) === dx && Math.abs(ax.x) > 0.3) || (dy && Math.sign(ax.y) === dy && Math.abs(ax.y) > 0.3);
-          ctx.fillStyle = 'rgba(11,14,28,0.5)'; ctx.fillRect(cx - 8, cy - 8, 17, 17);
-          ctx.fillStyle = on ? 'rgba(255,210,63,0.6)' : 'rgba(255,255,255,0.16)'; ctx.fillRect(cx - 7, cy - 7, 15, 15);
-          const c = on ? '#ffffff' : 'rgba(255,255,255,0.7)';
-          if (dx) tri(ctx, cx + dx * 4, cy, cx - dx * 3, cy - 4, cx - dx * 3, cy + 4, c);
-          else tri(ctx, cx, cy + dy * 4, cx - 4, cy - dy * 3, cx + 4, cy - dy * 3, c);
-        };
-        btn(0, -1); btn(0, 1); btn(-1, 0); btn(1, 0);
+      if (inp.ctrl === 'dpad') { // four big separate arrow buttons
+        const pressed = inp.pressedPads();
+        for (const [k, r] of Object.entries(inp.padButtons())) {
+          const on = pressed.has(k);
+          ctx.fillStyle = 'rgba(11,14,28,0.55)'; ctx.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+          ctx.fillStyle = on ? 'rgba(255,210,63,0.65)' : 'rgba(255,255,255,0.15)'; ctx.fillRect(r.x, r.y, r.w, r.h);
+          ctx.fillStyle = on ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)'; ctx.fillRect(r.x, r.y, r.w, 2);
+          const cx = r.x + r.w / 2, cy = r.y + r.h / 2, c = on ? '#ffffff' : 'rgba(255,255,255,0.75)';
+          if (r.dx) tri(ctx, cx + r.dx * 6, cy, cx - r.dx * 5, cy - 7, cx - r.dx * 5, cy + 7, c);
+          else tri(ctx, cx, cy + r.dy * 6, cx - 7, cy - r.dy * 5, cx + 7, cy - r.dy * 5, c);
+        }
       } else if (inp.ctrl === 'swipe') { // slide anywhere on the left half
         if (inp.stick) {
           disc(ctx, inp.stick.ox, inp.stick.oy, 21, 'rgba(255,255,255,0.08)');
@@ -597,7 +687,7 @@ export class PlayScene {
 
 // ---------- ENDING ----------
 export class EndScene {
-  constructor(game) { this.game = game; this.t = 0; this.S = buildSprites(BIOME[7]); game.input.mode = 'menu'; game.audio.music(8); }
+  constructor(game) { this.game = game; this.t = 0; this.S = buildSprites(BIOME[7], currentDiver(game.save).pal); game.input.mode = 'menu'; game.audio.music(8); }
   update(input) {
     this.t++;
     if (this.t > 90 && (input.confirm() || input.taps.length || input.back())) this.game.setScene(new TitleScene(this.game));

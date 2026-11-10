@@ -61,7 +61,7 @@ class Game {
 
   setScene(s) {
     this.scene = s;
-    this.input.stick = null; this.input.dashTouch = null;
+    this.input.clearTouches();
     if (!(s instanceof TitleScene)) this.pushBackGuard();
   }
 
@@ -74,7 +74,7 @@ class Game {
     if (sc instanceof TitleScene) return; // back from the menu leaves normally next time
     if (sc instanceof PlayScene && sc.world && sc.pause()) { this.pushBackGuard(); return; }
     this.scene = new TitleScene(this);
-    this.input.stick = null; this.input.dashTouch = null;
+    this.input.clearTouches();
   }
   play(id) { this.setScene(new PlayScene(this, id)); }
 
