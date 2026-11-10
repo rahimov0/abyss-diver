@@ -92,6 +92,12 @@ class Game {
   }
 }
 
+// iPhone/iPad in the Safari browser (not launched from the home screen)
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+const STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
+if (IS_IOS && !STANDALONE) document.documentElement.classList.add('ios-browser');
+window.IOS_BROWSER = IS_IOS && !STANDALONE;
+
 // iOS ignores user-scalable=no: block pinch / double-tap zoom ourselves
 function blockZoom(canvas) {
   const stop = (e) => e.preventDefault();

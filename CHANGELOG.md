@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.4
+- iPhone Safari: the top bar is moved below Safari's blurred status-bar strip.
+- Title screen tip on iPhone/iPad Safari: add to home screen for true full screen (no Safari blur or bottom bar).
+
 ## v3.3
 - Mini map in the top-right corner: reveals the cave as you explore and shows gems, keys, air vents, treasure you've seen and the exit.
 - Tap the mini map (or press M / Tab) for a full-screen map with a legend.

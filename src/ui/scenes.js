@@ -7,7 +7,7 @@ import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.3';
+export const VERSION = 'V3.4';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -142,6 +142,11 @@ export class TitleScene {
     const stars = Object.values(s.best).reduce((a, b) => a + (b.stars || 0), 0);
     drawText(ctx, `STARS ${stars}/${LEVELS.length * 3}`, 4, v.h - 8, '#fff3a0', { outline: '#0b0e1c' });
     drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
+    const mb = this.menu.rects.length ? this.menu.rects[this.menu.rects.length - 1].y + 15 : 0;
+    if (window.IOS_BROWSER && v.h - 34 > mb + 4) {
+      const lines = ['FULL SCREEN: TAP SHARE', 'THEN ADD TO HOME SCREEN'];
+      lines.forEach((l, i) => drawText(ctx, l, v.w / 2, v.h - 34 + i * 8, (t >> 5) % 2 ? '#ffffff' : '#fff3a0', { align: 'center', outline: '#0b0e1c' }));
+    }
   }
 }
 

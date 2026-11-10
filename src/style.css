@@ -16,6 +16,8 @@ html, body {
   overflow: hidden;
   touch-action: none;
 }
+/* iPhone Safari (not added to home screen) blurs a strip under the status bar: keep the HUD below it */
+html.ios-browser #wrap { top: calc(env(safe-area-inset-top, 0px) + 26px); }
 canvas#game {
   display: block; position: absolute; left: 0; top: 0;
   image-rendering: pixelated; image-rendering: crisp-edges;
