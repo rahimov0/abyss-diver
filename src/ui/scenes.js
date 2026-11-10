@@ -7,7 +7,7 @@ import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.4';
+export const VERSION = 'V3.5';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',

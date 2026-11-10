@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.5
+- iOS home-screen app also blurs the strip under the status bar: the HUD offset now applies there too.
+
 ## v3.4
 - iPhone Safari: the top bar is moved below Safari's blurred status-bar strip.
 - Title screen tip on iPhone/iPad Safari: add to home screen for true full screen (no Safari blur or bottom bar).
