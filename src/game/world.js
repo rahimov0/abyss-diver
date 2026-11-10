@@ -5,7 +5,7 @@ import { BIOME } from '../gfx/biomes.js';
 import { buildSprites } from '../gfx/sprites.js';
 import { renderTiles, renderFar } from '../gfx/levelArt.js';
 import { makeEnemy } from './enemies.js';
-import { disc, ellipse, tri, line, px, hash, makeCanvas, mix } from '../gfx/pixel.js';
+import { disc, ellipse, tri, line, px, hash, makeCanvas, mix, hexToRgb as hexRgb } from '../gfx/pixel.js';
 import { drawText } from '../engine/font.js';
 
 export const PHYS = { G: 0.04, DRAG: 0.965, ACC: 0.13, THRUST: 0.17, DIVE: 0.09, MAX: 2.7, DASH_V: 5.2, DASH_T: 11, DASH_CD: 38, R: 6.5, BOUNCE: 0.42 };
@@ -40,8 +40,46 @@ export class World {
     this.time = 0; this.shake = 0; this.state = 'play'; this.stateT = 0; this.flashT = 0;
     this.cam = { x: 0, y: 0 };
     this.darkC = null;
+    // minimap: 1 pixel per tile, revealed as you explore
+    this.mapC = makeCanvas(L.w, L.h);
+    this.mapX = this.mapC.getContext('2d');
+    this.mapImg = this.mapX.createImageData(L.w, L.h);
+    this.seen = new Uint8Array(L.w * L.h);
+    this.mapCols = {
+      water: hexRgb(mix(this.B.water[0], '#ffffff', 0.18)), rock: hexRgb(mix(this.B.rock[2], '#000000', 0.2)),
+      edge: hexRgb(this.B.surf[1]), crack: hexRgb(this.B.rock[3]), doors: this.S.keyCols.map((k) => hexRgb(k[0])),
+    };
+    this.revealMap(true);
     this.snow = Array.from({ length: 46 }, (_, i) => ({ x: hash(i, 1) * 600, y: hash(i, 2) * 600, s: 0.4 + hash(i, 3) * 0.6 }));
   }
+
+  // ---------- minimap ----------
+  mapPixel(i) {
+    const t = this.tiles[i], C = this.mapCols, d = this.mapImg.data, o = i * 4;
+    let c;
+    if (t === T.WATER) c = C.water;
+    else if (t === T.CRACK) c = C.crack;
+    else if (t >= T.DOOR0) c = C.doors[t - T.DOOR0];
+    else {
+      const x = i % this.L.w, y = (i / this.L.w) | 0;
+      c = this.tileAt(x, y - 1) === T.WATER ? C.edge : C.rock;
+    }
+    d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+  }
+  revealMap(force) {
+    const p = this.player, w = this.L.w, R = 7;
+    const cx = Math.floor(p.x / TILE), cy = Math.floor(p.y / TILE);
+    let dirty = force;
+    for (let dy = -R; dy <= R; dy++)
+      for (let dx = -R; dx <= R; dx++) {
+        const x = cx + dx, y = cy + dy;
+        if (x < 0 || y < 0 || x >= w || y >= this.L.h || dx * dx + dy * dy > R * R) continue;
+        const i = y * w + x;
+        if (!this.seen[i]) { this.seen[i] = 1; this.mapPixel(i); dirty = true; }
+      }
+    if (dirty) this.mapX.putImageData(this.mapImg, 0, 0);
+  }
+  mapTileChanged(i) { if (this.seen[i]) { this.mapPixel(i); this.mapDirty = true; } }
 
   // ---------- queries ----------
   tileAt(tx, ty) { return tx < 0 || ty < 0 || tx >= this.L.w || ty >= this.L.h ? T.ROCK : this.tiles[ty * this.L.w + tx]; }
@@ -86,6 +124,7 @@ export class World {
       const [x, y] = stack.pop();
       if (this.tileAt(x, y) !== T.CRACK) continue;
       this.tiles[y * this.L.w + x] = T.WATER; n++;
+      this.mapTileChanged(y * this.L.w + x);
       this.burst(x * TILE + 8, y * TILE + 8, 'debris', 10, this.B.rock[2]);
       this.burst(x * TILE + 8, y * TILE + 8, 'debris', 4, this.B.rock[3]);
       stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
@@ -98,6 +137,7 @@ export class World {
     for (let i = 0; i < this.tiles.length; i++)
       if (this.tiles[i] === T.DOOR0 + c) {
         this.tiles[i] = T.WATER; n++;
+        this.mapTileChanged(i);
         const x = (i % this.L.w) * TILE + 8, y = Math.floor(i / this.L.w) * TILE + 8;
         this.burst(x, y, 'spark', 8, this.S.keyCols[c][0]);
       }
@@ -201,6 +241,7 @@ export class World {
       return this.stateT > 70 ? 'won' : null;
     }
     this.updatePlayer(input);
+    if (this.time % 6 === 0 || this.mapDirty) { this.revealMap(this.mapDirty); this.mapDirty = false; }
 
     if (this.state === 'play') {
       // oxygen

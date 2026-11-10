@@ -33,7 +33,7 @@ class Game {
     this.acc = 0; this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.scene instanceof PlayScene && this.scene.mode === 'play') { this.scene.mode = 'pause'; this.input.mode = 'menu'; }
+      if (document.hidden && this.scene instanceof PlayScene) this.scene.pause();
     });
   }
 
@@ -43,10 +43,7 @@ class Game {
     const vw = r.width, vh = r.height;
     if (vw < 10 || vh < 10) return; // hidden / not laid out yet; the next resize event fixes it
     const pw = vw * dpr, ph = vh * dpr;
-    // phone mode: small screens get a closer view (bigger pixels); tablets/desktop see more of the cave
-    const phone = Math.min(vw, vh) < 520;
-    const m = Math.min(pw, ph);
-    let s = Math.max(1, phone ? Math.round(m / 170) : Math.floor(m / 192));
+    let s = Math.max(1, Math.floor(Math.min(pw, ph) / 192));
     let W = Math.floor(pw / s), H = Math.floor(ph / s);
     while (W > 440 || H > 540) { s++; W = Math.floor(pw / s); H = Math.floor(ph / s); }
     this.canvas.width = W; this.canvas.height = H;

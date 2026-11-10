@@ -11,10 +11,10 @@ export class Input {
     this.stick = null; // {id, ox, oy, x, y}
     this.dashTouch = null;
     this.dashQueued = false;
-    this.pauseRect = null;
+    this.hot = []; // [{x,y,w,h,code}] tappable HUD buttons during play
 
     addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
     });
@@ -40,8 +40,8 @@ export class Input {
     this.onGesture && this.onGesture();
     const p = this.toLocal(e);
     if (this.mode === 'play') {
-      const pr = this.pauseRect;
-      if (pr && p.x >= pr.x - 4 && p.y <= pr.y + pr.h + 4 && p.x <= pr.x + pr.w + 4) { this.pressed.add('Escape'); return; }
+      for (const h of this.hot)
+        if (p.x >= h.x - 4 && p.x <= h.x + h.w + 4 && p.y >= h.y - 4 && p.y <= h.y + h.h + 4) { this.pressed.add(h.code); return; }
       if (p.x < this.screen.w * 0.5) {
         if (!this.stick) this.stick = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
       } else {

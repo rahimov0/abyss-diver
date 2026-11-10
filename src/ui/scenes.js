@@ -7,10 +7,10 @@ import { buildSprites } from '../gfx/sprites.js';
 import { disc, px, mix, hash } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.2';
+export const VERSION = 'V3.3';
 
 const TIPS = {
-  1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL!',
+  1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
   2: 'FISH BITE! PRESS SPACE / DASH TO RAM THROUGH THEM.',
   3: 'CRABS CAN BE DASHED. SPIKY URCHINS CANNOT!',
   4: 'JELLYFISH STING. DASHING WONT HELP - DODGE THEM.',
@@ -237,7 +237,7 @@ export class PlayScene {
   }
 
   pause() {
-    if (this.mode !== 'play' && this.mode !== 'intro') return false;
+    if (this.mode !== 'play' && this.mode !== 'intro' && this.mode !== 'map') return false;
     this.mode = 'pause';
     const i = this.game.input;
     i.mode = 'menu'; i.stick = null; i.dashTouch = null;
@@ -268,6 +268,11 @@ export class PlayScene {
       input.dash();
       return;
     }
+    if (this.mode === 'map') {
+      input.mode = 'menu';
+      if (this.t - this.mapT > 10 && (input.taps.length || input.back() || input.confirm() || input.hit('KeyM') || input.hit('Tab'))) { this.mode = 'play'; input.mode = 'play'; }
+      return;
+    }
     if (this.mode === 'pause') {
       input.mode = 'menu';
       if (input.back()) { this.mode = 'play'; return; }
@@ -278,6 +283,7 @@ export class PlayScene {
     if (this.mode === 'play') {
       input.mode = 'play';
       if (input.back() || input.hit('KeyP')) { this.pause(); return; }
+      if (input.hit('KeyM') || input.hit('Tab')) { this.mode = 'map'; this.mapT = this.t; input.mode = 'menu'; input.stick = null; input.dashTouch = null; this.game.audio.play('click'); return; }
       const r = W.update(input);
       if (r === 'won') this.onWin();
       if (r === 'lost') {
@@ -314,32 +320,98 @@ export class PlayScene {
     ]);
   }
 
+  // small radar-style map in the top-right corner (tap it for the full map)
+  drawMiniMap(ctx) {
+    const v = this.game.view, W = this.world, L = W.L, t = this.t;
+    const size = 40, x0 = v.w - size - 3, y0 = 19;
+    const p = W.player, ptx = Math.floor(p.x / 16), pty = Math.floor(p.y / 16);
+    const sx = Math.max(0, Math.min(L.w - size, ptx - size / 2)), sy = Math.max(0, Math.min(L.h - size, pty - size / 2));
+    const ox = x0 + Math.max(0, Math.floor((size - L.w) / 2)), oy = y0 + Math.max(0, Math.floor((size - L.h) / 2));
+    ctx.fillStyle = '#0b0e1c'; ctx.fillRect(x0 - 2, y0 - 2, size + 4, size + 4);
+    ctx.fillStyle = '#3aaee0'; ctx.fillRect(x0 - 1, y0 - 1, size + 2, size + 2);
+    ctx.fillStyle = 'rgba(4,6,16,0.82)'; ctx.fillRect(x0, y0, size, size);
+    const sw = Math.min(size, L.w), sh = Math.min(size, L.h);
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(W.mapC, sx, sy, sw, sh, ox, oy, sw, sh);
+    ctx.globalAlpha = 1;
+    const dot = (tx, ty, col, big) => {
+      const x = ox + tx - sx, y = oy + ty - sy;
+      if (x < x0 || y < y0 || x >= x0 + size || y >= y0 + size) return;
+      ctx.fillStyle = col; ctx.fillRect(x - (big ? 1 : 0), y - (big ? 1 : 0), big ? 2 : 1, big ? 2 : 1);
+    };
+    this.mapMarkers((tx, ty, col, big) => dot(tx, ty, col, big));
+    if ((t >> 3) % 2) dot(ptx, pty, '#ffffff', true);
+    else dot(ptx, pty, '#ffd23f', true);
+    return { x: x0 - 2, y: y0 - 2, w: size + 4, h: size + 4 };
+  }
+
+  mapMarkers(dot) {
+    const W = this.world, t = this.t;
+    for (const g of W.gems) if (!g.got) dot(g.tx, g.ty, '#5dff7a', false);
+    for (const k of W.keys) if (!k.got) dot(k.tx, k.ty, W.S.keyCols[k.c][0], true);
+    for (const c of W.chests) if (!c.got && W.seen[c.ty * W.L.w + c.tx]) dot(c.tx, c.ty, '#ffd23f', false);
+    for (const a of W.air) if (W.seen[a.ty * W.L.w + a.tx]) dot(a.tx, a.ty, '#d8f4ff', false);
+    const e = W.exit;
+    if (!e.open || (t >> 3) % 2) dot(e.tx + 1, e.ty + 1, e.open ? '#7affe0' : '#ff8ad8', true);
+  }
+
+  drawFullMap(ctx) {
+    const v = this.game.view, W = this.world, L = W.L, t = this.t;
+    ctx.fillStyle = 'rgba(3,5,14,0.92)'; ctx.fillRect(0, 0, v.w, v.h);
+    drawText(ctx, 'MAP', v.w / 2, 6, '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
+    const k = Math.max(1, Math.floor(Math.min((v.w - 12) / L.w, (v.h - 70) / L.h)));
+    const mw = L.w * k, mh = L.h * k, x0 = Math.floor((v.w - mw) / 2), y0 = 24;
+    ctx.fillStyle = '#3aaee0'; ctx.fillRect(x0 - 1, y0 - 1, mw + 2, mh + 2);
+    ctx.fillStyle = '#05070f'; ctx.fillRect(x0, y0, mw, mh);
+    ctx.drawImage(W.mapC, 0, 0, L.w, L.h, x0, y0, mw, mh);
+    const s = Math.max(2, k);
+    this.mapMarkers((tx, ty, col, big) => {
+      ctx.fillStyle = col;
+      const d = big ? s + 1 : s;
+      ctx.fillRect(x0 + tx * k + Math.floor((k - d) / 2), y0 + ty * k + Math.floor((k - d) / 2), d, d);
+    });
+    const p = W.player;
+    const px0 = x0 + Math.floor((p.x / 16) * k), py0 = y0 + Math.floor((p.y / 16) * k);
+    ctx.fillStyle = (t >> 3) % 2 ? '#ffffff' : '#ffd23f';
+    ctx.fillRect(px0 - 2, py0 - 2, 4, 4);
+    const ly = Math.min(v.h - 30, y0 + mh + 6);
+    const legend = [['#ffd23f', 'YOU'], ['#5dff7a', 'GEM'], ['#d8f4ff', 'AIR'], ['#ff8ad8', 'EXIT']];
+    legend.forEach(([c, l], i) => {
+      const lx = Math.floor(v.w / 2 - 82 + i * 42);
+      ctx.fillStyle = c; ctx.fillRect(lx, ly + 1, 3, 3);
+      drawText(ctx, l, lx + 6, ly, '#d8f4ff');
+    });
+    if ((t >> 4) % 2) drawText(ctx, 'TAP TO CLOSE', v.w / 2, ly + 12, '#9aa4b8', { align: 'center' });
+  }
+
   drawHUD(ctx) {
     const v = this.game.view, W = this.world, S = W.S, t = this.t;
-    ctx.fillStyle = 'rgba(5,8,20,0.55)'; ctx.fillRect(0, 0, v.w, 11);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, 11, v.w, 1);
-    ctx.drawImage(S.gemS, 3, 2);
-    drawText(ctx, String(W.gemsLeft).padStart(2, '0'), 12, 3, W.gemsLeft === 0 ? '#7affe0' : '#ffd23f');
-    ctx.drawImage(S.chestS, 24, 3);
-    drawText(ctx, `${W.chestsGot}`, 33, 3, '#ffd23f');
-    drawText(ctx, String(W.score).padStart(5, '0'), v.w / 2, 3, '#ffd23f', { align: 'center' });
+    // solid top bar (opaque so the cave never shows through and smears the text)
+    ctx.fillStyle = '#070b1a'; ctx.fillRect(0, 0, v.w, 15);
+    ctx.fillStyle = '#1f3a6a'; ctx.fillRect(0, 15, v.w, 1);
+    ctx.fillStyle = '#02030a'; ctx.fillRect(0, 16, v.w, 1);
+    ctx.drawImage(S.gemS, 3, 4);
+    drawText(ctx, String(W.gemsLeft).padStart(2, '0'), 12, 5, W.gemsLeft === 0 ? '#7affe0' : '#ffe066');
+    ctx.drawImage(S.chestS, 24, 5);
+    drawText(ctx, `${W.chestsGot}`, 33, 5, '#ffe066');
+    drawText(ctx, String(W.score).padStart(5, '0'), v.w / 2, 5, '#ffffff', { align: 'center' });
     const pr = { x: v.w - 15, y: 1, w: 14, h: 13 };
-    this.game.input.pauseRect = pr;
     panel(ctx, pr.x, pr.y, pr.w, pr.h, '#0b1430', '#ffd23f');
     px(ctx, pr.x + 4, pr.y + 3, '#ffffff', 2, 7); px(ctx, pr.x + 8, pr.y + 3, '#ffffff', 2, 7);
-    for (let i = 0; i < 3; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 44 + i * 9, 3);
+    for (let i = 0; i < 3; i++) ctx.drawImage(i < W.hearts ? S.heart : S.heartE, v.w - 44 + i * 9, 5);
     // oxygen bar
     const low = W.o2 < 0.25;
     const bw = 44;
-    drawText(ctx, 'O2', 3, 14, low && (t >> 3) % 2 ? '#ff6060' : '#8ae8ff', { outline: '#0b0e1c' });
-    ctx.fillStyle = '#0b0e1c'; ctx.fillRect(12, 14, bw + 2, 5);
-    ctx.fillStyle = '#1a2440'; ctx.fillRect(13, 15, bw, 3);
+    drawText(ctx, 'O2', 3, 20, low && (t >> 3) % 2 ? '#ff6060' : '#8ae8ff', { outline: '#0b0e1c' });
+    ctx.fillStyle = '#0b0e1c'; ctx.fillRect(12, 20, bw + 2, 5);
+    ctx.fillStyle = '#1a2440'; ctx.fillRect(13, 21, bw, 3);
     ctx.fillStyle = low ? ((t >> 3) % 2 ? '#ff4d4d' : '#b3202e') : W.o2 < 0.5 ? '#ffd23f' : '#8ae8ff';
-    ctx.fillRect(13, 15, Math.round(bw * W.o2), 3);
-    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(13, 15, Math.round(bw * W.o2), 1);
+    ctx.fillRect(13, 21, Math.round(bw * W.o2), 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(13, 21, Math.round(bw * W.o2), 1);
     let kx = 62;
-    for (const c of W.held) { ctx.drawImage(S.keys[c], kx, 14); kx += 13; }
-    drawText(ctx, `LV${this.id}`, v.w - 3, 17, '#9aa4b8', { align: 'right', outline: '#0b0e1c' });
+    for (const c of W.held) { ctx.drawImage(S.keys[c], kx, 20); kx += 13; }
+    const mr = this.drawMiniMap(ctx);
+    this.game.input.hot = [{ ...pr, code: 'Escape' }, { ...mr, code: 'KeyM' }];
     // dash cooldown + touch controls
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
@@ -384,6 +456,7 @@ export class PlayScene {
       lines.forEach((l, i) => drawText(ctx, l, v.w / 2, y + 42 + i * 8, '#fff3a0', { align: 'center' }));
       ctx.globalAlpha = 1;
     }
+    if (this.mode === 'map') this.drawFullMap(ctx);
     if (this.mode === 'pause') {
       ctx.fillStyle = 'rgba(3,5,14,0.7)'; ctx.fillRect(0, 0, v.w, v.h);
       drawText(ctx, 'PAUSED', v.w / 2, v.h / 2 - 70, '#ffd23f', { align: 'center', scale: 3, outline: '#0b0e1c' });
