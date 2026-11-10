@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.7
+- SETTINGS menu (title screen + pause): controls (fixed JOYSTICK / ARROW buttons / SWIPE), VIEW (NORMAL / WIDE / CLOSE), mini map on/off, sound, music.
+- VIEW WIDE shows much more of the cave, especially in portrait.
+- Mini map is smaller and see-through; tap it for the big map. With the mini map off a small MAP button remains.
+- Level lock: `npm run validate` now fails if any of the 50 levels changes (fingerprints in tools/level-snapshots.json).
+
 ## v3.6
 - Touch joystick is now fixed in the bottom-left corner (it no longer follows the finger around); always visible during play.
 

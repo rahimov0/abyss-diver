@@ -4,10 +4,10 @@ import { LEVELS } from '../level/levels.js';
 import { BIOME } from '../gfx/biomes.js';
 import { World } from '../game/world.js';
 import { buildSprites } from '../gfx/sprites.js';
-import { disc, px, mix, hash } from '../gfx/pixel.js';
+import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 
-export const VERSION = 'V3.6';
+export const VERSION = 'V3.7';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -66,6 +66,39 @@ class Menu {
   }
 }
 
+// ---------- settings (shared by the title screen and the pause menu) ----------
+export const CONTROL_NAMES = { stick: 'JOYSTICK', dpad: 'ARROWS', swipe: 'SWIPE' };
+const CONTROL_HELP = {
+  stick: ['LEFT: FIXED JOYSTICK', 'RIGHT: DASH'],
+  dpad: ['LEFT: ARROW BUTTONS', 'RIGHT: DASH'],
+  swipe: ['LEFT: SLIDE FINGER TO SWIM', 'RIGHT: DASH'],
+};
+const VIEW_NAMES = { normal: 'NORMAL', wide: 'WIDE', close: 'CLOSE' };
+function cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
+
+function settingsMenu(game, back) {
+  const s = game.save;
+  const save = () => writeSave(s);
+  return new Menu(game, [
+    { label: () => `CONTROLS  ${CONTROL_NAMES[s.controls]}`, act: () => { s.controls = cycle(['stick', 'dpad', 'swipe'], s.controls); game.input.ctrl = s.controls; save(); } },
+    { label: () => `VIEW  ${VIEW_NAMES[s.view]}`, act: () => { s.view = cycle(['normal', 'wide', 'close'], s.view); save(); game.resize(); } },
+    { label: () => `MINI MAP  ${s.minimap ? 'ON' : 'OFF'}`, act: () => { s.minimap = !s.minimap; save(); } },
+    { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
+    { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
+    { label: 'BACK', act: back },
+  ]);
+}
+
+function drawSettings(ctx, game, menu, t) {
+  const v = game.view, s = game.save;
+  drawText(ctx, 'SETTINGS', v.w / 2, Math.max(8, v.h / 2 - 92), '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
+  const y = Math.max(26, v.h / 2 - 70);
+  menu.draw(ctx, v.w / 2, y, 140, 15, 4, t);
+  const hy = y + menu.items.length * 19 + 6;
+  CONTROL_HELP[s.controls].forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
+  drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 20, '#5d6478', { align: 'center', outline: '#0b0e1c' });
+}
+
 // animated underwater backdrop for menus
 function backdrop(ctx, v, t, S, B = BIOME[0]) {
   const g = ctx.createLinearGradient(0, 0, 0, v.h);
@@ -117,13 +150,18 @@ export class TitleScene {
     this.menu = new Menu(game, [
       { label: () => (s.unlocked > 1 ? `CONTINUE  LV ${Math.min(s.unlocked, LEVELS.length)}` : 'START DIVE'), act: () => game.play(Math.min(s.unlocked, LEVELS.length)) },
       { label: 'SELECT LEVEL', act: () => game.setScene(new SelectScene(game)) },
-      { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; writeSave(s); } },
-      { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); writeSave(s); } },
+      { label: 'SETTINGS', act: () => { this.mode = 'settings'; this.settings.sel = 0; } },
     ]);
+    this.mode = 'main';
+    this.settings = settingsMenu(game, () => { this.mode = 'main'; });
     game.input.mode = 'menu';
     game.audio.music(8);
   }
-  update(input) { this.t++; this.menu.update(input); }
+  update(input) {
+    this.t++;
+    if (this.mode === 'settings') { if (input.back()) { this.mode = 'main'; return; } this.settings.update(input); return; }
+    this.menu.update(input);
+  }
   draw(ctx) {
     const v = this.game.view, t = this.t;
     backdrop(ctx, v, t, this.S);
@@ -136,6 +174,12 @@ export class TitleScene {
     if (t % 20 === 0) this.bub = (this.bub || []).concat([{ x: v.w / 2 + (Math.random() * 10 - 5), y: hy + 30, l: 80 }]);
     this.bub = (this.bub || []).filter((b) => (b.y -= 0.5, b.l--, b.l > 0));
     for (const b of this.bub) px(ctx, b.x + Math.sin(b.l * 0.2), b.y, 'rgba(220,245,255,0.8)', 2, 2);
+    if (this.mode === 'settings') {
+      ctx.fillStyle = 'rgba(3,5,14,0.75)'; ctx.fillRect(0, 0, v.w, v.h);
+      drawSettings(ctx, this.game, this.settings, t);
+      drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
+      return;
+    }
     const my = Math.min(v.h - 100, hy + 46);
     this.menu.draw(ctx, v.w / 2, my, 132, 15, 4, t);
     const s = this.game.save;
@@ -234,14 +278,16 @@ export class PlayScene {
     this.pauseMenu = new Menu(game, [
       { label: 'RESUME', act: () => { this.mode = 'play'; } },
       { label: 'RESTART', act: () => game.play(id) },
-      { label: () => `SOUND  ${game.save.sound ? 'ON' : 'OFF'}`, act: () => { game.save.sound = !game.save.sound; game.audio.sfxOn = game.save.sound; writeSave(game.save); } },
-      { label: () => `MUSIC  ${game.save.music ? 'ON' : 'OFF'}`, act: () => { game.save.music = !game.save.music; game.audio.setMusic(game.save.music); writeSave(game.save); } },
+      { label: 'SETTINGS', act: () => { this.mode = 'settings'; this.settings.sel = 0; } },
       { label: 'LEVEL SELECT', act: () => game.setScene(new SelectScene(game)) },
       { label: 'MAIN MENU', act: () => game.setScene(new TitleScene(game)) },
     ]);
+    this.settings = settingsMenu(game, () => { this.mode = 'pause'; });
   }
 
   pause() {
+    if (this.mode === 'settings') { this.mode = 'pause'; return true; }
+    if (this.mode === 'pause') return false;
     if (this.mode !== 'play' && this.mode !== 'intro' && this.mode !== 'map') return false;
     this.mode = 'pause';
     const i = this.game.input;
@@ -276,6 +322,12 @@ export class PlayScene {
     if (this.mode === 'map') {
       input.mode = 'menu';
       if (this.t - this.mapT > 10 && (input.taps.length || input.back() || input.confirm() || input.hit('KeyM') || input.hit('Tab'))) { this.mode = 'play'; input.mode = 'play'; }
+      return;
+    }
+    if (this.mode === 'settings') {
+      input.mode = 'menu';
+      if (input.back()) { this.mode = 'pause'; return; }
+      this.settings.update(input);
       return;
     }
     if (this.mode === 'pause') {
@@ -328,15 +380,23 @@ export class PlayScene {
   // small radar-style map in the top-right corner (tap it for the full map)
   drawMiniMap(ctx) {
     const v = this.game.view, W = this.world, L = W.L, t = this.t;
-    const size = 40, x0 = v.w - size - 3, y0 = 19;
+    if (!this.game.save.minimap) { // map turned off: keep a small MAP button for the full map
+      const r = { x: v.w - 20, y: 19, w: 18, h: 10 };
+      ctx.fillStyle = 'rgba(11,14,28,0.5)'; ctx.fillRect(r.x, r.y, r.w, r.h);
+      drawText(ctx, 'MAP', r.x + 9, r.y + 3, 'rgba(255,255,255,0.75)', { align: 'center' });
+      return r;
+    }
+    // small and see-through so it never hides the cave; tap for the big map
+    const size = 30, x0 = v.w - size - 3, y0 = 20;
     const p = W.player, ptx = Math.floor(p.x / 16), pty = Math.floor(p.y / 16);
     const sx = Math.max(0, Math.min(L.w - size, ptx - size / 2)), sy = Math.max(0, Math.min(L.h - size, pty - size / 2));
     const ox = x0 + Math.max(0, Math.floor((size - L.w) / 2)), oy = y0 + Math.max(0, Math.floor((size - L.h) / 2));
-    ctx.fillStyle = '#0b0e1c'; ctx.fillRect(x0 - 2, y0 - 2, size + 4, size + 4);
-    ctx.fillStyle = '#3aaee0'; ctx.fillRect(x0 - 1, y0 - 1, size + 2, size + 2);
-    ctx.fillStyle = 'rgba(4,6,16,0.82)'; ctx.fillRect(x0, y0, size, size);
+    ctx.fillStyle = 'rgba(4,6,16,0.28)'; ctx.fillRect(x0, y0, size, size);
+    ctx.fillStyle = 'rgba(58,174,224,0.5)';
+    ctx.fillRect(x0 - 1, y0 - 1, size + 2, 1); ctx.fillRect(x0 - 1, y0 + size, size + 2, 1);
+    ctx.fillRect(x0 - 1, y0, 1, size); ctx.fillRect(x0 + size, y0, 1, size);
     const sw = Math.min(size, L.w), sh = Math.min(size, L.h);
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.5;
     ctx.drawImage(W.mapC, sx, sy, sw, sh, ox, oy, sw, sh);
     ctx.globalAlpha = 1;
     const dot = (tx, ty, col, big) => {
@@ -420,17 +480,39 @@ export class PlayScene {
     // dash cooldown + touch controls
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
-      // fixed joystick in the bottom-left corner
       const b = inp.stickBase();
-      disc(ctx, b.x, b.y, b.r + 1, 'rgba(11,14,28,0.45)');
-      disc(ctx, b.x, b.y, b.r - 1, inp.stick ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)');
-      let kx = b.x, ky = b.y;
-      if (inp.stick) {
-        const dx = inp.stick.x - b.x, dy = inp.stick.y - b.y, d = Math.hypot(dx, dy), m = Math.min(d, b.r - 6) / (d || 1);
-        kx += dx * m; ky += dy * m;
-      } else drawText(ctx, 'MOVE', b.x, b.y + b.r + 3 > v.h - 6 ? b.y - b.r - 8 : b.y + b.r + 3, 'rgba(255,255,255,0.35)', { align: 'center' });
-      disc(ctx, kx, ky, 9, 'rgba(11,14,28,0.5)');
-      disc(ctx, kx, ky, 8, inp.stick ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)');
+      if (inp.ctrl === 'dpad') { // arrow buttons
+        const ax = inp.axis();
+        const btn = (dx, dy) => {
+          const cx = b.x + dx * 15, cy = b.y + dy * 15;
+          const on = (dx && Math.sign(ax.x) === dx && Math.abs(ax.x) > 0.3) || (dy && Math.sign(ax.y) === dy && Math.abs(ax.y) > 0.3);
+          ctx.fillStyle = 'rgba(11,14,28,0.5)'; ctx.fillRect(cx - 8, cy - 8, 17, 17);
+          ctx.fillStyle = on ? 'rgba(255,210,63,0.6)' : 'rgba(255,255,255,0.16)'; ctx.fillRect(cx - 7, cy - 7, 15, 15);
+          const c = on ? '#ffffff' : 'rgba(255,255,255,0.7)';
+          if (dx) tri(ctx, cx + dx * 4, cy, cx - dx * 3, cy - 4, cx - dx * 3, cy + 4, c);
+          else tri(ctx, cx, cy + dy * 4, cx - 4, cy - dy * 3, cx + 4, cy - dy * 3, c);
+        };
+        btn(0, -1); btn(0, 1); btn(-1, 0); btn(1, 0);
+      } else if (inp.ctrl === 'swipe') { // slide anywhere on the left half
+        if (inp.stick) {
+          disc(ctx, inp.stick.ox, inp.stick.oy, 21, 'rgba(255,255,255,0.08)');
+          const dx = inp.stick.x - inp.stick.ox, dy = inp.stick.y - inp.stick.oy, d = Math.hypot(dx, dy), m = Math.min(d, 18) / (d || 1);
+          disc(ctx, inp.stick.ox + dx * m, inp.stick.oy + dy * m, 7, 'rgba(255,255,255,0.35)');
+        } else {
+          drawText(ctx, 'SLIDE TO', b.x + 2, b.y - 6, 'rgba(255,255,255,0.35)', { align: 'center' });
+          drawText(ctx, 'SWIM', b.x + 2, b.y + 2, 'rgba(255,255,255,0.35)', { align: 'center' });
+        }
+      } else { // fixed joystick in the bottom-left corner
+        disc(ctx, b.x, b.y, b.r + 1, 'rgba(11,14,28,0.45)');
+        disc(ctx, b.x, b.y, b.r - 1, inp.stick ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)');
+        let kx = b.x, ky = b.y;
+        if (inp.stick) {
+          const dx = inp.stick.x - b.x, dy = inp.stick.y - b.y, d = Math.hypot(dx, dy), m = Math.min(d, b.r - 6) / (d || 1);
+          kx += dx * m; ky += dy * m;
+        } else drawText(ctx, 'MOVE', b.x, b.y + b.r + 3 > v.h - 6 ? b.y - b.r - 8 : b.y + b.r + 3, 'rgba(255,255,255,0.35)', { align: 'center' });
+        disc(ctx, kx, ky, 9, 'rgba(11,14,28,0.5)');
+        disc(ctx, kx, ky, 8, inp.stick ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)');
+      }
       const bx = v.w - 30, by = v.h - 32, cd = W.player.dashCD;
       disc(ctx, bx, by, 17, 'rgba(11,14,28,0.5)');
       disc(ctx, bx, by, 15, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd > 0 ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');
@@ -464,6 +546,10 @@ export class PlayScene {
       ctx.globalAlpha = 1;
     }
     if (this.mode === 'map') this.drawFullMap(ctx);
+    if (this.mode === 'settings') {
+      ctx.fillStyle = 'rgba(3,5,14,0.8)'; ctx.fillRect(0, 0, v.w, v.h);
+      drawSettings(ctx, this.game, this.settings, t);
+    }
     if (this.mode === 'pause') {
       ctx.fillStyle = 'rgba(3,5,14,0.7)'; ctx.fillRect(0, 0, v.w, v.h);
       drawText(ctx, 'PAUSED', v.w / 2, v.h / 2 - 70, '#ffd23f', { align: 'center', scale: 3, outline: '#0b0e1c' });

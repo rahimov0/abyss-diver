@@ -2,8 +2,22 @@
 import { LEVELS } from '../src/level/levels.js';
 import { generateLevel } from '../src/level/generate.js';
 import { T } from '../src/level/grid.js';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
-const only = process.argv[2] ? +process.argv[2] : 0;
+// Level lock: the 50 levels are frozen. Any code change that alters a level's layout, items,
+// enemies or tuning makes this check fail. Re-baseline ONLY when a level change is intended:
+//   node tools/validate-levels.mjs --update
+const SNAP = new URL('./level-snapshots.json', import.meta.url);
+const UPDATE = process.argv.includes('--update');
+const snaps = existsSync(SNAP) ? JSON.parse(readFileSync(SNAP, 'utf8')) : {};
+const fingerprint = (L) => createHash('sha256').update(JSON.stringify({
+  spec: L.spec, tiles: Array.from(L.tiles), spawn: L.spawn, exit: L.exit, gems: L.gems, keys: L.keys, chests: L.chests,
+  air: L.air, enemies: L.enemies, currents: L.currents, vents: L.vents, deco: L.deco,
+})).digest('hex').slice(0, 16);
+let changed = 0;
+
+const only = process.argv[2] && /^\d+$/.test(process.argv[2]) ? +process.argv[2] : 0;
 let fail = 0;
 for (const spec of LEVELS) {
   if (only && spec.id !== only) continue;
@@ -19,6 +33,9 @@ for (const spec of LEVELS) {
     if (L.currents.length < spec.currents) warn.push(`currents ${L.currents.length}/${spec.currents}`);
     if (L.vents.length < spec.vents) warn.push(`vents ${L.vents.length}/${spec.vents}`);
     let cracks = 0; for (const t of L.tiles) if (t === T.CRACK) cracks++;
+    const fp = fingerprint(L);
+    if (UPDATE) snaps[spec.id] = fp;
+    else if (snaps[spec.id] && snaps[spec.id] !== fp) { changed++; warn.push('LEVEL CHANGED (locked!)'); }
     console.log(`${String(spec.id).padStart(2)} ${spec.name.padEnd(18)} ${spec.arch.padEnd(8)} ${L.w}x${L.h} path=${L.pathLen} gems=${L.gems.length} air=${L.air.length} cracks=${cracks} try=${L.attempt} ${ms}ms ${warn.length ? '⚠ ' + warn.join(', ') : ''}`);
     if (only) {
       const rows = [];
@@ -41,5 +58,7 @@ for (const spec of LEVELS) {
     console.log(`${spec.id} FAIL ${e.message}`);
   }
 }
+if (UPDATE) { writeFileSync(SNAP, JSON.stringify(snaps, null, 1) + '\n'); console.log('snapshots updated'); }
+if (changed) console.log(`\n${changed} locked level(s) CHANGED — revert, or run with --update if the change was requested`);
 console.log(fail ? `\n${fail} level(s) FAILED` : '\nAll levels valid ✔');
-process.exit(fail ? 1 : 0);
+process.exit(fail || changed ? 1 : 0);

@@ -14,6 +14,7 @@ class Game {
     this.audio.sfxOn = this.save.sound;
     this.audio.musicOn = this.save.music;
     this.input = new Input(canvas, this.view);
+    this.input.ctrl = this.save.controls || 'stick';
     this.input.onGesture = () => this.audio.unlock();
     addEventListener('keydown', () => this.audio.unlock());
     this.wrap = canvas.parentElement;
@@ -43,9 +44,11 @@ class Game {
     const vw = r.width, vh = r.height;
     if (vw < 10 || vh < 10) return; // hidden / not laid out yet; the next resize event fixes it
     const pw = vw * dpr, ph = vh * dpr;
-    let s = Math.max(1, Math.floor(Math.min(pw, ph) / 192));
+    // VIEW setting: how many game pixels fit on the short side of the screen
+    const target = { normal: 192, wide: 240, close: 168 }[this.save.view] || 192;
+    let s = Math.max(1, Math.floor(Math.min(pw, ph) / target));
     let W = Math.floor(pw / s), H = Math.floor(ph / s);
-    while (W > 440 || H > 540) { s++; W = Math.floor(pw / s); H = Math.floor(ph / s); }
+    while (W > 520 || H > 560) { s++; W = Math.floor(pw / s); H = Math.floor(ph / s); }
     this.canvas.width = W; this.canvas.height = H;
     const cw = (W * s) / dpr, ch = (H * s) / dpr;
     this.canvas.style.width = `${cw}px`;

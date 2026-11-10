@@ -117,7 +117,7 @@ export function renderTiles(L, B) {
 
 // Half-resolution distant cave silhouettes, drawn at 0.5 parallax and scaled 2x
 export function renderFar(L, B, seed) {
-  const W = Math.ceil((L.w * TILE * 0.5 + 460) / 2), H = Math.ceil((L.h * TILE * 0.5 + 540) / 2);
+  const W = Math.ceil((L.w * TILE * 0.5 + 540) / 2), H = Math.ceil((L.h * TILE * 0.5 + 580) / 2);
   const c = makeCanvas(W, H);
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(W, H);
