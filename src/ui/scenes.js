@@ -87,8 +87,31 @@ function settingsMenu(game, back) {
     { label: () => `VIBRATION  ${s.vibrate !== false ? 'ON' : 'OFF'}`, act: () => { s.vibrate = s.vibrate === false; save(); if (s.vibrate) try { navigator.vibrate && navigator.vibrate(40); } catch { /* */ } } },
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
+    { label: () => accountLabel(game), act: () => accountAction(game) },
     { label: 'BACK', act: back },
   ]);
+}
+
+// ---------- cloud account (Google sign-in) ----------
+function accountLabel(game) {
+  const c = game.cloud;
+  if (!c || !c.enabled) return 'CLOUD SAVE  SOON';
+  if (c.status === 'loading' || c.status === 'signing') return 'CONNECTING...';
+  if (!c.user) return 'SIGN IN WITH GOOGLE';
+  if (c.confirmOut && Date.now() - c.confirmOut < 3000) return 'TAP AGAIN: SIGN OUT';
+  return `${c.status === 'error' ? 'SYNC ERROR' : 'SYNCED'}  ${c.name}`;
+}
+function accountAction(game) {
+  const c = game.cloud;
+  if (!c || !c.enabled || c.status === 'loading' || c.status === 'signing') return;
+  if (!c.user) { c.signIn(); return; }
+  if (c.confirmOut && Date.now() - c.confirmOut < 3000) { c.confirmOut = 0; c.signOut(); return; }
+  c.confirmOut = Date.now();
+}
+export function cloudBadge(game) {
+  const c = game.cloud;
+  if (!c || !c.enabled || !c.user) return null;
+  return c.status === 'error' ? ['CLOUD: ERROR', '#ff6060'] : c.status === 'syncing' ? ['CLOUD: SYNCING', '#ffd23f'] : ['CLOUD: SAVED', '#7affe0'];
 }
 
 function drawSettings(ctx, game, menu, t) {
@@ -193,6 +216,8 @@ export class TitleScene {
     const s = this.game.save;
     const stars = Object.values(s.best).reduce((a, b) => a + (b.stars || 0), 0);
     drawText(ctx, `STARS ${stars}/${LEVELS.length * 3}`, 4, v.h - 8, '#fff3a0', { outline: '#0b0e1c' });
+    const cb = cloudBadge(this.game);
+    if (cb) drawText(ctx, cb[0], 4, v.h - 16, cb[1], { outline: '#0b0e1c' });
     drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
     const mb = this.menu.rects.length ? this.menu.rects[this.menu.rects.length - 1].y + 15 : 0;
     if (window.IOS_BROWSER && v.h - 34 > mb + 4) {

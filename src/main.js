@@ -3,6 +3,7 @@ import { Audio } from './engine/audio.js';
 import { loadSave } from './game/save.js';
 import { TitleScene, PlayScene } from './ui/scenes.js';
 import { LEVELS } from './level/levels.js';
+import { Cloud } from './cloud.js';
 
 class Game {
   constructor(canvas) {
@@ -10,6 +11,7 @@ class Game {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.view = { w: 216, h: 320 };
     this.save = loadSave();
+    this.cloud = new Cloud(this);
     this.audio = new Audio();
     this.audio.sfxOn = this.save.sound;
     this.audio.musicOn = this.save.music;
