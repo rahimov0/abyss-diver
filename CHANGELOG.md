@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.9
+- Cloud save: SETTINGS → SIGN IN WITH GOOGLE. Progress (levels, stars, scores, diver) follows you to every device; merging never loses progress.
+
 ## v3.8
 - ARROWS control: four big separate buttons; each finger presses exactly one direction (two fingers for diagonals).
 - Level select: tapping a level only selects it, a big PLAY button starts it; swipe to turn pages; landscape layout.
