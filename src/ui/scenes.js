@@ -8,7 +8,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V3.9';
+export const VERSION = 'V3.9.1';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -96,14 +96,17 @@ function settingsMenu(game, back) {
 function accountLabel(game) {
   const c = game.cloud;
   if (!c || !c.enabled) return 'CLOUD SAVE  SOON';
-  if (c.status === 'loading' || c.status === 'signing') return 'CONNECTING...';
+  if (c.status === 'loading') return 'CONNECTING...';
+  if (c.status === 'signing') return Date.now() - c.signStart > 12000 ? 'TAP TO TRY AGAIN' : 'OPENING GOOGLE...';
+  if (c.lastError && Date.now() - c.lastError < 6000 && !c.user) return 'FAILED - TAP TO RETRY';
   if (!c.user) return 'SIGN IN WITH GOOGLE';
   if (c.confirmOut && Date.now() - c.confirmOut < 3000) return 'TAP AGAIN: SIGN OUT';
   return `${c.status === 'error' ? 'SYNC ERROR' : 'SYNCED'}  ${c.name}`;
 }
 function accountAction(game) {
   const c = game.cloud;
-  if (!c || !c.enabled || c.status === 'loading' || c.status === 'signing') return;
+  if (!c || !c.enabled || c.status === 'loading') return;
+  if (c.status === 'signing' && Date.now() - c.signStart < 12000) return;
   if (!c.user) { c.signIn(); return; }
   if (c.confirmOut && Date.now() - c.confirmOut < 3000) { c.confirmOut = 0; c.signOut(); return; }
   c.confirmOut = Date.now();
@@ -119,6 +122,9 @@ function drawSettings(ctx, game, menu, t) {
   drawText(ctx, 'SETTINGS', v.w / 2, Math.max(8, v.h / 2 - 92), '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
   const y = Math.max(26, v.h / 2 - 70);
   menu.draw(ctx, v.w / 2, y, 140, 15, 4, t);
+  // the Google button runs straight from the touch event, otherwise iPhone blocks the sign-in window
+  const ai = menu.items.length - 2, ar = menu.rects[ai];
+  if (ar) game.input.gestureRects.push({ ...ar, fn: () => { menu.sel = ai; game.audio.play('select'); accountAction(game); } });
   const hy = y + menu.items.length * 19 + 6;
   CONTROL_HELP[s.controls].forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
   drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 20, '#5d6478', { align: 'center', outline: '#0b0e1c' });

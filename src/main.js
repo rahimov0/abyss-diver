@@ -92,6 +92,7 @@ class Game {
     }
     if (steps === 4) this.acc = 0;
     this.ctx.imageSmoothingEnabled = false;
+    this.input.gestureRects = [];
     try { this.scene.draw(this.ctx); } catch (e) { console.error(e); }
     requestAnimationFrame((t) => this.frame(t));
   }

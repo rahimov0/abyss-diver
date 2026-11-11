@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.9.1
+- Google sign-in window now opens straight from the tap (touchend), so iPhone no longer blocks it; the button never stays stuck on CONNECTING (shows TAP TO TRY AGAIN / FAILED - TAP TO RETRY).
+
 ## v3.9
 - Cloud save: SETTINGS → SIGN IN WITH GOOGLE. Progress (levels, stars, scores, diver) follows you to every device; merging never loses progress.
 

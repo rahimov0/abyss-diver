@@ -16,6 +16,8 @@ export class Input {
     this.pads = new Map(); // dpad: pointerId -> 'up'|'down'|'left'|'right'|null
     this.swipes = []; // menu swipes [{dx, dy}]
     this.menuPtr = new Map(); // menu pointers: id -> {sx, sy, x, y}
+    // buttons that must run inside the real touch event (e.g. opening the Google sign-in window on iPhone)
+    this.gestureRects = [];
 
     addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
@@ -31,6 +33,10 @@ export class Input {
     addEventListener('pointerup', (e) => this.up(e), opts);
     addEventListener('pointercancel', (e) => this.up(e), opts);
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('touchend', () => {
+      const fn = this.pendingGesture;
+      if (fn) { this.pendingGesture = null; fn(); }
+    }, { passive: true });
   }
 
   toLocal(e) {
@@ -84,7 +90,17 @@ export class Input {
       this.menuPtr.delete(e.pointerId);
       const dx = m.x - m.sx, dy = m.y - m.sy;
       if (e.type === 'pointerup') {
-        if (Math.hypot(dx, dy) < 10) this.taps.push({ x: m.sx, y: m.sy });
+        if (Math.hypot(dx, dy) < 10) {
+          const g = this.gestureRects.find((r) => m.sx >= r.x && m.sx <= r.x + r.w && m.sy >= r.y && m.sy <= r.y + r.h);
+          if (g) {
+            if (e.pointerType === 'touch') { // run it in the touchend that follows (Safari's trusted gesture)
+              this.pendingGesture = g.fn;
+              setTimeout(() => { if (this.pendingGesture === g.fn) { this.pendingGesture = null; g.fn(); } }, 120);
+            } else g.fn();
+            return;
+          }
+          this.taps.push({ x: m.sx, y: m.sy });
+        }
         else if (Math.max(Math.abs(dx), Math.abs(dy)) > 24) this.swipes.push({ dx, dy });
       }
     }

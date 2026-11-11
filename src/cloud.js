@@ -41,19 +41,22 @@ export class Cloud {
     return n.split(/[ @]/)[0].toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'PLAYER';
   }
 
-  async signIn() {
+  // Must be called directly from a tap/click handler (no await before it), or Safari blocks the window.
+  signIn() {
     if (!this.enabled || !this.auth) return;
-    this.status = 'signing';
-    try {
-      await this.fb.signInWithPopup(this.auth, this.provider);
-    } catch (e) {
+    this.status = 'signing'; this.signStart = Date.now();
+    this.fb.signInWithPopup(this.auth, this.provider).then(() => {
+      if (this.status === 'signing') this.status = 'syncing';
+    }).catch((e) => {
       const code = e && e.code;
-      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/cancelled-popup-request') {
-        try { await this.fb.signInWithRedirect(this.auth, this.provider); return; } catch (e2) { console.warn(e2); }
+      console.warn('sign-in failed', code, e);
+      this.lastErrorCode = code; this.lastError = Date.now();
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        this.fb.signInWithRedirect(this.auth, this.provider).catch((e2) => { console.warn(e2); this.status = 'signedout'; });
+        return;
       }
-      console.warn('sign-in failed', e);
       this.status = this.user ? 'synced' : 'signedout';
-    }
+    });
   }
 
   async signOut() {
