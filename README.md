@@ -3,7 +3,7 @@
 A retro pixel deep‑sea arcade game inspired by the classic Sony Ericsson / mophun era game **Deep Abyss** (2002).
 Original art, code and level design.
 
-▶ **Play:** https://rahimov0.github.io/abyss-diver/
+▶ **Play:** https://abyss-diver.rahimov.tr/
 
 Pilot a little bathysphere through underwater caves, collect every gem to open the portal, find secret treasure,
 manage your oxygen and survive 50 increasingly hard levels.
