@@ -75,7 +75,8 @@ export class Cloud {
       const remote = snap.exists() ? snap.data().save : null;
       const s = this.game.save;
       if (mergeProgress(s, remote)) writeSave(s, { silent: true });
-      await this.push();
+      this.lastPushed = remote ? JSON.stringify(progressOf({ unlocked: 1, best: {}, diver: 'bubble', ...remote })) : null;
+      await this.push(); // only writes if this device had progress the cloud didn't
       this.status = 'synced';
     } catch (e) { console.warn('cloud pull failed', e); this.status = 'error'; }
   }
@@ -86,11 +87,15 @@ export class Cloud {
     this.timer = setTimeout(() => this.push(), 1200);
   }
 
+  // Writes only when progress actually changed (settings like sound/controls never cost a write).
   async push() {
     if (!this.user) return;
     clearTimeout(this.timer);
+    const data = progressOf(this.game.save), json = JSON.stringify(data);
+    if (json === this.lastPushed) { this.status = 'synced'; return; }
     try {
-      await this.fb.setDoc(this.ref(), { save: progressOf(this.game.save), updated: Date.now() });
+      await this.fb.setDoc(this.ref(), { save: data, updated: Date.now() });
+      this.lastPushed = json;
       this.status = 'synced';
     } catch (e) { console.warn('cloud push failed', e); this.status = 'error'; }
   }
