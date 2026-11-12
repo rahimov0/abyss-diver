@@ -45,6 +45,38 @@ export function renderTiles(L, B) {
         const v = fbm(px * 0.07, py * 0.07, 3) + (h - 0.5) * 0.25 - (dd > 12 ? 0.2 : 0);
         return v < 0.42 ? rock[4] : v < 0.6 ? rock[0] : v < 0.75 ? rock[1] : rock[2];
       }
+      case 'neon': { // carved stone blocks, some with glowing glyphs
+        const by = Math.floor(py / 10), off = by % 2 ? 8 : 0;
+        const bx = Math.floor((px + off) / 16), lx = (px + off) % 16, ly = py % 10;
+        if (ly === 0 || lx === 0) return rock[4];
+        const hb = hash(bx, by, 21);
+        if (hb < 0.22 && dd > 2 && ly >= 3 && ly <= 7 && lx >= 3 && lx <= 13) {
+          const g = (hb * 1000) | 0; // pick a glyph per block
+          const on = g % 3 === 0 ? (ly === 5 || lx === 8) : g % 3 === 1 ? (lx - 3 === (ly - 3) * 2 || lx === 13 - (ly - 3) * 2) : (ly === 3 || ly === 7) && lx % 3 !== 1;
+          if (on) return rock[3];
+        }
+        const v = hb + (h - 0.5) * 0.2 - (dd > 10 ? 0.25 : 0);
+        return v < 0.3 ? rock[0] : v < 0.7 ? rock[1] : rock[2];
+      }
+      case 'toxic': { // rotten rock with glowing slime pockets
+        const n = vnoise(px * 0.1, py * 0.1, 7);
+        if (n > 0.8 && dd > 2) return rock[3];
+        if (n > 0.74) return rock[2];
+        const v = fbm(px * 0.06, py * 0.06, 9) + (h - 0.5) * 0.25 - (dd > 10 ? 0.2 : 0);
+        if (hash(px, py, 31) < 0.04) return rock[4];
+        return v < 0.4 ? rock[4] : v < 0.58 ? rock[0] : v < 0.75 ? rock[1] : rock[2];
+      }
+      case 'metal': { // riveted steel panels
+        const bx = Math.floor(px / 32), by = Math.floor(py / 16), lx = px % 32, ly = py % 16;
+        if (lx === 0 || ly === 0) return rock[4];
+        if (lx === 31 || ly === 15) return rock[0];
+        if ((lx === 3 || lx === 28) && (ly === 3 || ly === 12)) return rock[2];
+        const grille = hash(bx, by, 41) < 0.12;
+        if (grille && ly > 4 && ly < 12 && lx > 6 && lx < 26) return (ly % 2) ? rock[4] : rock[0];
+        if (hash(bx, by, 43) < 0.04 && lx > 12 && lx < 20 && ly > 5 && ly < 10) return rock[3]; // warning light
+        const v = 0.55 - ly / 40 + (hash(bx, by, 44) - 0.5) * 0.2 - (dd > 10 ? 0.25 : 0);
+        return v < 0.3 ? rock[0] : v < 0.55 ? rock[1] : rock[2];
+      }
       case 'abyss': {
         if (h < 0.004) return rock[3];
         const v = fbm(px * 0.06, py * 0.06, 6) + (h - 0.5) * 0.2 - (dd > 8 ? 0.3 : 0);
@@ -93,13 +125,15 @@ export function renderTiles(L, B) {
             if (D && Lf && lx < RC && 15 - ly < RC) cand(RC - Math.hypot(RC - lx - 0.5, RC - (15 - ly) - 0.5), false);
             if (D && R && 15 - lx < RC && 15 - ly < RC) cand(RC - Math.hypot(RC - (15 - lx) - 0.5, RC - (15 - ly) - 0.5), false);
           }
-          const geometric = B.style === 'planks' || B.style === 'bricks';
+          const geometric = B.style === 'planks' || B.style === 'bricks' || B.style === 'metal' || B.style === 'neon';
           const e = geometric ? 0.3 + vnoise(px * 0.3, py * 0.3, 3) * 1.2 : 0.4 + vnoise(px * 0.21, py * 0.21, 3) * 3.2;
           if (dist < e) continue;
           const dd = dist - e;
           let col;
           if (dd < 1) col = edge;
-          else if (top) {
+          else if (top && B.style === 'metal') { // hazard-striped deck edge
+            col = dd < 4 ? ((px + Math.floor(dd)) % 8 < 4 ? surf[0] : surf[1]) : interior(px, py, dd);
+          } else if (top) {
             const thick = 3 + vnoise(px * 0.15, ty, 9) * 3.5;
             if (dd < 2.2) col = surf[0];
             else if (dd < thick) col = (dd < thick - 1.2 || hash(px, py, 2) < 0.5) ? surf[1] : surf[2];

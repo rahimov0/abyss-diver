@@ -65,10 +65,12 @@ const RAW = [
 export const BIOMES = [
   'CORAL SHALLOWS', 'KELP FOREST', 'SUNKEN WRECK', 'CRYSTAL GROTTO',
   'FROZEN TRENCH', 'VOLCANIC RIFT', 'SUNKEN TEMPLE', 'MIDNIGHT ABYSS',
+  'NEON ATLANTIS', 'TOXIC TRENCH', 'SUBMARINE BASE',
 ];
 
-export const LEVELS = RAW.map(([name, biome, arch, w, h, gems, o], i) => {
-  const d = i / (RAW.length - 1);
+// ---- Levels 1-50 (LOCKED: never change these rows or this mapping — see tools/level-snapshots.json) ----
+const LEVELS_1_50 = RAW.map(([name, biome, arch, w, h, gems, o], i) => {
+  const d = i / 49;
   return {
     id: i + 1, name, biome, arch, w, h, gems,
     p: o.p || {},
@@ -89,3 +91,68 @@ export const LEVELS = RAW.map(([name, biome, arch, w, h, gems, o], i) => {
     seed: 1000 + (i + 1) * 7717,
   };
 });
+
+// ---- Levels 51-75: the world below the abyss ----
+// biome 8 Neon Atlantis, 9 Toxic Trench, 10 Submarine Base
+// extra options: gates (switch + timed gate), portals (sealed vaults reached by portal), whirl (whirlpools),
+// crush (crushers), acid (acid pools), pups (hatchlings to rescue), harpoon (harpoon ammo in the level),
+// escape ('down' | 'up' | 'right': a deadly wall chases you, exit open from the start), boss, exitAt
+const RAW2 = [
+  // ---- NEON ATLANTIS ----
+  ['Gates of Atlantis', 8, 'city', 44, 46, 11, { gates: 1, chests: 1, e: { sentinel: 2, fish: 4, jelly: 3 } }],
+  ['Drowned Avenue', 8, 'climb', 30, 80, 12, { portals: 1, chests: 1, e: { zapper: 3, eel: 3, urchin: 3 } }],
+  ['Hall of Echoes', 8, 'hub', 50, 50, 12, { harpoon: 8, exitAt: 'center', dark: 0.7, chests: 2, e: { sentinel: 3, puffer: 4, crab: 3 } }],
+  ['Collapsing Spire', 8, 'escapeV', 28, 110, 10, { escape: 'down', e: { jelly: 4, zapper: 2 } }],
+  ['Crab King', 8, 'bossroom', 40, 30, 0, { boss: 'crabking', harpoon: 6, e: {} }],
+  ['Temple Rings', 8, 'rings', 46, 46, 13, { p: { thick: 2.2 }, gates: 2, whirl: 2, chests: 2, e: { sentinel: 3, zapper: 3 } }],
+  ['Lost Hatchlings', 8, 'city', 50, 54, 10, { pups: 4, chests: 1, e: { zapper: 3, shark: 1, eel: 3 } }],
+  ['Twin Reflections', 8, 'twin', 50, 50, 12, { portals: 2, dark: 0.6, chests: 2, e: { angler: 3, sentinel: 2, jelly: 4 } }],
+  // ---- TOXIC TRENCH ----
+  ['Acid Falls', 9, 'climb', 32, 84, 13, { acid: true, chests: 1, e: { sludge: 4, gasvent: 4 } }],
+  ['Puffer Overlord', 9, 'bossroom', 40, 34, 0, { boss: 'pufferking', harpoon: 6, e: {} }],
+  ['Sludge Works', 9, 'pipes', 49, 49, 13, { gates: 2, crush: 3, chests: 1, e: { sludge: 4, gasvent: 3, crab: 3 } }],
+  ['Rot Canal', 9, 'escapeH', 130, 28, 10, { escape: 'right', e: { sludge: 3, gasvent: 3 } }],
+  ['Poison Nursery', 9, 'hub', 52, 52, 10, { pups: 5, acid: true, harpoon: 10, dark: 0.65, chests: 2, e: { sludge: 3, puffer: 3, angler: 2 } }],
+  ['Whirlpool Graves', 9, 'rings', 48, 48, 14, { p: { thick: 2.4 }, whirl: 4, portals: 1, chests: 2, e: { gasvent: 4, mine: 5 } }],
+  ['Hydra', 9, 'bossroom', 44, 34, 0, { boss: 'hydra', harpoon: 10, e: {} }],
+  ['Dead Reef', 9, 'twin', 52, 52, 14, { portals: 2, acid: true, crush: 2, dark: 0.55, chests: 2, e: { sludge: 3, shark: 1, gasvent: 2 } }],
+  // ---- SUBMARINE BASE ----
+  ['Docking Bay', 10, 'city', 52, 48, 14, { gates: 2, harpoon: 10, chests: 2, e: { drone: 4, crab: 3, sentinel: 2 } }],
+  ['Pressure Pipes', 10, 'pipes', 53, 53, 14, { crush: 4, chests: 1, e: { drone: 4, spinner: 3 } }],
+  ['Reactor Run', 10, 'escapeV', 28, 116, 10, { escape: 'up', e: { drone: 3, mine: 4 } }],
+  ['Mecha Shark', 10, 'bossroom', 46, 34, 0, { boss: 'mechashark', harpoon: 10, e: {} }],
+  ['Containment', 10, 'hub', 54, 54, 12, { pups: 5, gates: 1, dark: 0.55, harpoon: 10, chests: 2, e: { drone: 5, zapper: 3 } }],
+  ['Teleport Lab', 10, 'twin', 54, 54, 15, { portals: 3, whirl: 2, chests: 2, e: { drone: 4, sentinel: 3 } }],
+  ['Crusher Line', 10, 'climb', 34, 90, 15, { crush: 6, gates: 2, chests: 1, e: { drone: 4, eel: 3 } }],
+  ['Abyss Gate', 10, 'rings', 56, 56, 16, { p: { thick: 2.2 }, gates: 2, portals: 1, crush: 3, whirl: 2, dark: 0.5, harpoon: 12, chests: 3, e: { drone: 5, sentinel: 2, zapper: 2 } }],
+  // ---- FINAL ----
+  ['Kraken', 8, 'bossroom', 50, 40, 0, { boss: 'kraken', harpoon: 14, dark: 0.6, e: {} }],
+];
+
+const LEVELS_51_75 = RAW2.map(([name, biome, arch, w, h, gems, o], k) => {
+  const id = 51 + k;
+  const d = 0.72 + (k / (RAW2.length - 1)) * 0.33; // harder than the first chapter, still climbing
+  return {
+    id, name, biome, arch, w, h, gems,
+    p: o.p || {},
+    doors: 0, secrets: o.secrets || 0, crackWalls: 0, currents: 0, vents: 0,
+    chests: Math.max(o.chests || 0, o.secrets || 0),
+    dark: o.dark || 0,
+    enemies: o.e || {},
+    safe: 8,
+    diff: d,
+    speed: 1 + d * 0.62,
+    o2: Math.round(95 - d * 48),
+    airR: Math.round(30 - d * 8),
+    current: 0.05,
+    seed: 1000 + id * 7717,
+    // chapter-2 features
+    gates: o.gates || 0, portals: o.portals || 0, whirl: o.whirl || 0, crush: o.crush || 0,
+    acid: !!o.acid, pups: o.pups || 0, harpoon: o.harpoon || 0,
+    escape: o.escape || null, boss: o.boss || null, exitAt: o.exitAt || null,
+    chapter: 2,
+  };
+});
+
+export const LEVELS = [...LEVELS_1_50, ...LEVELS_51_75];
+export const CHAPTER1 = 50;

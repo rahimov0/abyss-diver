@@ -12,7 +12,14 @@ const SONGS = [
   { root: 54, scale: [0, 2, 3, 7, 8], prog: [0, 3, 2, 4], bpm: 98, lead: 'square' }, // temple
   { root: 50, scale: [0, 1, 3, 7, 8], prog: [0, 4, 1, 3], bpm: 84, lead: 'triangle' }, // abyss
   { root: 60, scale: [0, 2, 4, 7, 9], prog: [0, 4, 3, 4], bpm: 126, lead: 'square' }, // title
+  { root: 58, scale: [0, 2, 3, 7, 10], prog: [0, 3, 4, 1], bpm: 108, lead: 'triangle' }, // 9: neon atlantis
+  { root: 49, scale: [0, 1, 3, 6, 7], prog: [0, 1, 4, 1], bpm: 96, lead: 'sawtooth' }, // 10: toxic trench
+  { root: 53, scale: [0, 3, 5, 7, 10], prog: [0, 0, 3, 4], bpm: 132, lead: 'square' }, // 11: submarine base
+  { root: 45, scale: [0, 1, 3, 5, 8], prog: [0, 4, 1, 3], bpm: 140, lead: 'sawtooth' }, // 12: boss fight
 ];
+
+// song index for a biome (title music sits at index 8)
+export const songFor = (biome, boss) => (boss ? 12 : biome >= 8 ? biome + 1 : biome);
 
 export class Audio {
   constructor() {

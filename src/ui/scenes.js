@@ -1,5 +1,6 @@
 // Title, level select and play scenes (all drawn on the pixel canvas)
 import { drawText, wrap } from '../engine/font.js';
+import { songFor } from '../engine/audio.js';
 import { LEVELS } from '../level/levels.js';
 import { BIOME } from '../gfx/biomes.js';
 import { World } from '../game/world.js';
@@ -8,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V3.9.1';
+export const VERSION = 'V4.0';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -31,7 +32,26 @@ const TIPS = {
   31: 'THE HEAT RISES. RIDE THE VENTS.',
   43: 'THE MIDNIGHT ZONE. ONLY YOUR LAMP CAN SAVE YOU.',
   50: 'THE LEVIATHAN AWAKENS! EVERY GEM YOU TAKE STUNS IT.',
+  51: 'CHAPTER 2: NEON ATLANTIS. ENERGY GATES BLOCK THE WAY - TOUCH THE RED SWITCH, THEN RACE THROUGH BEFORE THE TIMER ENDS!',
+  52: 'PURPLE PORTALS ARE LINKED IN PAIRS. SWIM IN TO TELEPORT. ZAPPERS SEND OUT ELECTRIC RINGS.',
+  53: 'HARPOON GUN! GRAB HARPOON BUNDLES, THEN FIRE WITH C OR THE FIRE BUTTON. TURRETS NEED TWO HITS.',
+  54: 'THE SPIRE IS COLLAPSING! DIVE DOWN FAST - DONT LET THE FALLING ROCK CATCH YOU. THE EXIT IS ALREADY OPEN.',
+  55: 'BOSS: THE CRAB KING. HARPOON HIM, AND DASH INTO HIM WHILE HE IS DIZZY AFTER A SLAM.',
+  56: 'WHIRLPOOLS PULL YOU IN. SWIM AWAY FROM THE SPINNING CORE!',
+  57: 'RESCUE MISSION: FREE EVERY TRAPPED BABY TURTLE AND LEAD THEM TO THE EXIT. SOME ARE BEHIND CRACKED ROCK.',
+  59: 'THE TOXIC TRENCH. GREEN ACID POOLS BURN - NEVER TOUCH THEM. SLUDGE BLOBS CAN BE DASHED.',
+  60: 'BOSS: THE PUFFER OVERLORD. HIT HIM ONLY WHEN HE IS SMALL. WATCH OUT FOR THE SPINE RINGS!',
+  61: 'CRUSHERS SLAM SHUT ON A RHYTHM. WAIT FOR THEM TO OPEN, THEN GO!',
+  62: 'TOXIC FLOOD! SWIM RIGHT AS FAST AS YOU CAN.',
+  65: 'BOSS: THE HYDRA. KNOCK OUT ALL THREE HEADS - THE BODY IS ARMORED.',
+  67: 'THE SUBMARINE BASE. DRONES AIM BEFORE THEY FIRE - KEEP MOVING. RED LASER GATES NEED SWITCHES.',
+  69: 'REACTOR MELTDOWN! CLIMB UP BEFORE THE FIRE REACHES YOU.',
+  70: 'BOSS: THE MECHA SHARK. MAKE IT CRASH INTO A WALL, THEN DASH ITS CORE. SHOOT DOWN ITS TORPEDOES.',
+  71: 'THE LAB IS FULL OF TRAPPED BABIES. SAVE THEM ALL!',
+  74: 'THE ABYSS GATE. EVERYTHING YOU LEARNED, ALL AT ONCE.',
+  75: 'FINAL BOSS: THE KRAKEN. WAIT FOR ITS EYE TO OPEN, THEN STRIKE. BEWARE THE INK!',
 };
+const PAGES = Math.ceil(LEVELS.length / 25);
 
 // ---------- shared UI helpers ----------
 export function panel(ctx, x, y, w, h, fill = '#0b1430', border = '#3aaee0') {
@@ -273,7 +293,7 @@ export class SelectScene {
         }
   }
   setPage(p) {
-    const np = Math.max(0, Math.min(1, p));
+    const np = Math.max(0, Math.min(PAGES - 1, p));
     if (np === this.page) return;
     this.page = np; this.sel = np * 25; this.game.audio.play('click');
   }
@@ -292,6 +312,7 @@ export class SelectScene {
     for (let i = 0; i < 25; i++) {
       const id = this.page * 25 + i;
       const Lv = LEVELS[id];
+      if (!Lv) continue;
       const x = x0 + (i % 5) * (cell + gap), y = y0 + Math.floor(i / 5) * (cell + gap);
       const locked = id >= s.unlocked;
       const B = BIOME[Lv.biome];
@@ -328,7 +349,7 @@ export class SelectScene {
     btn('<', cx0, 24, 'prev');
     btn('BACK', mid - 28, 56, 'back');
     btn('>', cx0 + cw - 24, 24, 'next');
-    drawText(ctx, `PAGE ${this.page + 1}/2  -  SWIPE TO TURN`, mid, by + 19, '#9aa4b8', { align: 'center' });
+    drawText(ctx, `PAGE ${this.page + 1}/${PAGES}  -  SWIPE TO TURN`, mid, by + 19, '#9aa4b8', { align: 'center' });
   }
 }
 
@@ -423,7 +444,7 @@ export class PlayScene {
     this.world = new World(this.spec, this.game);
     this.world.snapCam();
     this.mode = 'intro'; this.t = 0;
-    this.game.audio.music(this.spec.biome);
+    this.game.audio.music(songFor(this.spec.biome, this.spec.boss));
   }
 
   update(input) {
@@ -536,7 +557,9 @@ export class PlayScene {
     const W = this.world, t = this.t;
     for (const g of W.gems) if (!g.got) dot(g.tx, g.ty, '#5dff7a', false);
     for (const k of W.keys) if (!k.got) dot(k.tx, k.ty, W.S.keyCols[k.c][0], true);
-    for (const c of W.chests) if (!c.got && W.seen[c.ty * W.L.w + c.tx]) dot(c.tx, c.ty, '#ffd23f', false);
+    const reveal = W.diver.reveal; // lantern diver sees hidden treasure
+    for (const c of W.chests) if (!c.got && (reveal || W.seen[c.ty * W.L.w + c.tx])) dot(c.tx, c.ty, '#ffd23f', reveal);
+    if (W.ch2) W.ch2.markers(dot, W.seen, W.L.w, reveal);
     for (const a of W.air) if (W.seen[a.ty * W.L.w + a.tx]) dot(a.tx, a.ty, '#d8f4ff', false);
     const e = W.exit;
     if (!e.open || (t >> 3) % 2) dot(e.tx + 1, e.ty + 1, e.open ? '#7affe0' : '#ff8ad8', true);
@@ -562,7 +585,9 @@ export class PlayScene {
     ctx.fillStyle = (t >> 3) % 2 ? '#ffffff' : '#ffd23f';
     ctx.fillRect(px0 - 2, py0 - 2, 4, 4);
     const ly = Math.min(v.h - 30, y0 + mh + 6);
-    const legend = [['#ffd23f', 'YOU'], ['#5dff7a', 'GEM'], ['#d8f4ff', 'AIR'], ['#ff8ad8', 'EXIT']];
+    const legend = W.ch2 && W.ch2.pupsTotal ? [['#ffd23f', 'YOU'], ['#5dff7a', 'GEM'], ['#7affe0', 'BABY'], ['#ff8ad8', 'EXIT']]
+      : W.ch2 && W.ch2.switches.length ? [['#ffd23f', 'YOU'], ['#5dff7a', 'GEM'], ['#ff4d4d', 'SWITCH'], ['#ff8ad8', 'EXIT']]
+        : [['#ffd23f', 'YOU'], ['#5dff7a', 'GEM'], ['#d8f4ff', 'AIR'], ['#ff8ad8', 'EXIT']];
     legend.forEach(([c, l], i) => {
       const lx = Math.floor(v.w / 2 - 82 + i * 42);
       ctx.fillStyle = c; ctx.fillRect(lx, ly + 1, 3, 3);
@@ -597,8 +622,24 @@ export class PlayScene {
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(13, 21, Math.round(bw * W.o2), 1);
     let kx = 62;
     for (const c of W.held) { ctx.drawImage(S.keys[c], kx, 20); kx += 13; }
+    // chapter 2 counters: harpoons, babies, and diver ability status
+    let ry = 28;
+    if (W.ch2 && (W.ammo > 0 || W.ch2.harpoons.length)) {
+      px(ctx, 4, ry + 2, '#c8d0e0', 7, 1); px(ctx, 10, ry + 1, '#ffd23f', 2, 3);
+      drawText(ctx, `${W.ammo}`, 14, ry, W.ammo ? '#ffffff' : '#5d6478', { outline: '#0b0e1c' });
+      ry += 8;
+    }
+    if (W.ch2 && W.ch2.pupsTotal) {
+      disc(ctx, 7, ry + 2, 2.5, '#4ab05a');
+      drawText(ctx, `${W.ch2.pupsWith}/${W.ch2.pupsTotal}`, 14, ry, W.ch2.pupsReady ? '#7affe0' : '#ffffff', { outline: '#0b0e1c' });
+      ry += 8;
+    }
+    if (W.diver.shell) drawText(ctx, W.shellT > 0 ? `SHELL ${Math.ceil(W.shellT / 60)}` : 'SHELL OK', 3, ry, W.shellT > 0 ? '#5d6478' : '#8ee05a', { outline: '#0b0e1c' });
+    else if (W.maxDash > 1) for (let i = 0; i < W.maxDash; i++) px(ctx, 4 + i * 6, ry + 1, i < W.player.charges ? '#ffd23f' : '#3a4050', 4, 3);
     const mr = this.drawMiniMap(ctx);
     this.game.input.hot = [{ ...pr, code: 'Escape' }, { ...mr, code: 'KeyM' }];
+    const fireBtn = this.game.input.touchUI && this.mode === 'play' && W.ch2 && (W.ammo > 0 || W.ch2.harpoons.length);
+    if (fireBtn) this.game.input.hot.push({ x: v.w - 70, y: v.h - 74, w: 24, h: 24, code: 'KeyC' });
     // dash cooldown + touch controls
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
@@ -634,10 +675,17 @@ export class PlayScene {
         disc(ctx, kx, ky, 9, 'rgba(11,14,28,0.5)');
         disc(ctx, kx, ky, 8, inp.stick ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)');
       }
-      const bx = v.w - 30, by = v.h - 32, cd = W.player.dashCD;
+      const bx = v.w - 30, by = v.h - 32, cd = W.player.charges <= 0;
       disc(ctx, bx, by, 17, 'rgba(11,14,28,0.5)');
-      disc(ctx, bx, by, 15, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd > 0 ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');
+      disc(ctx, bx, by, 15, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');
       drawText(ctx, 'DASH', bx, by - 2, '#ffffff', { align: 'center' });
+      if (fireBtn) {
+        const fx = v.w - 58, fy = v.h - 62;
+        disc(ctx, fx, fy, 13, 'rgba(11,14,28,0.5)');
+        disc(ctx, fx, fy, 11, W.ammo > 0 ? 'rgba(255,90,90,0.4)' : 'rgba(90,100,120,0.35)');
+        drawText(ctx, 'FIRE', fx, fy - 5, '#ffffff', { align: 'center' });
+        drawText(ctx, String(W.ammo), fx, fy + 1, W.ammo ? '#ffd23f' : '#9aa4b8', { align: 'center' });
+      }
     }
   }
 
@@ -662,7 +710,8 @@ export class PlayScene {
       panel(ctx, 12, y, v.w - 24, h, 'rgba(8,14,34,0.92)', B.surf[0]);
       drawText(ctx, `LEVEL ${this.id}`, v.w / 2, y + 6, B.ui, { align: 'center' });
       drawText(ctx, this.spec.name, v.w / 2, y + 15, '#ffffff', { align: 'center', scale: 2, outline: '#0b0e1c' });
-      drawText(ctx, `${B.name}  -  ${this.spec.gems} GEMS`, v.w / 2, y + 31, '#9aa4b8', { align: 'center' });
+      const goal = this.spec.boss ? 'BOSS FIGHT' : this.spec.escape ? 'ESCAPE!' : this.spec.pups ? `${this.spec.gems} GEMS + ${this.spec.pups} BABIES` : `${this.spec.gems} GEMS`;
+      drawText(ctx, `${B.name}  -  ${goal}`, v.w / 2, y + 31, '#9aa4b8', { align: 'center' });
       lines.forEach((l, i) => drawText(ctx, l, v.w / 2, y + 42 + i * 8, '#fff3a0', { align: 'center' }));
       ctx.globalAlpha = 1;
     }

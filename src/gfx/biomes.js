@@ -64,4 +64,28 @@ export const BIOME = [
     fish: ['#b080ff', '#5a30b0'], weed: ['#3af0ff', '#1a80b0'], coral: ['#3af0ff', '#ff5ae0', '#7affa0'],
     snow: '#6a8aff', ui: '#3af0ff',
   },
+  { // 8 neon atlantis
+    name: 'NEON ATLANTIS', style: 'neon', rays: false,
+    water: ['#2c1c70', '#08061e'], far: '#1c1252',
+    rock: ['#1a1438', '#2c2458', '#40367a', '#3af0ff', '#100c24'], edge: '#06040f',
+    surf: ['#7affe0', '#2ab0c8', '#1a5a8a'],
+    fish: ['#ff7ae0', '#a03aa0'], weed: ['#3af0ff', '#1a80b0'], coral: ['#ff7ae0', '#7affe0', '#ffe07a'],
+    snow: '#a090ff', ui: '#7affe0',
+  },
+  { // 9 toxic trench
+    name: 'TOXIC TRENCH', style: 'toxic', rays: false,
+    water: ['#2e4c1a', '#0a1406'], far: '#1e3412',
+    rock: ['#1c1c10', '#2e2c1a', '#4a4428', '#a6ff2a', '#0e0e08'], edge: '#060604',
+    surf: ['#b6ff3a', '#6ac020', '#3a6a12'],
+    fish: ['#c0d060', '#6a7a20'], weed: ['#8acc30', '#4a7a18'], coral: ['#a6ff2a', '#e0e060', '#7a5a2a'],
+    snow: '#c8ff8a', ui: '#b6ff3a',
+  },
+  { // 10 submarine base
+    name: 'SUBMARINE BASE', style: 'metal', rays: false,
+    water: ['#20404e', '#081218'], far: '#14303c',
+    rock: ['#20262e', '#3a4450', '#56626e', '#ffb020', '#14181e'], edge: '#0a0c10',
+    surf: ['#ffd23f', '#2a2a2a', '#5a6470'],
+    fish: ['#c0c8d0', '#6a7480'], weed: ['#56626e', '#3a4450'], coral: ['#ff4040', '#40ff80', '#ffb020'],
+    snow: '#a0c0d0', ui: '#ffb020',
+  },
 ];

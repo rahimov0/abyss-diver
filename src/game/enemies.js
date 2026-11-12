@@ -4,7 +4,7 @@ import { disc, ellipse, tri, line, px } from '../gfx/pixel.js';
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
-class Base {
+export class Base {
   constructor(d, W) {
     this.type = d.type; this.x = d.x; this.y = d.y; this.d = d;
     this.r = 6; this.alive = true; this.t = Math.random() * 1000;
@@ -462,9 +462,9 @@ class Boss extends Base {
   }
 }
 
-function W_LIGHT(e, r, a) { return { x: e.x, y: e.y, r, a }; }
+export function W_LIGHT(e, r, a) { return { x: e.x, y: e.y, r, a }; }
 
-const TYPES = { fish: Fish, crab: Crab, jelly: Jelly, urchin: Urchin, puffer: Puffer, eel: Eel, clam: Clam, mine: Mine, spike: Spike, spinner: Spinner, shark: Shark, angler: Angler, boss: Boss };
+export const TYPES = { fish: Fish, crab: Crab, jelly: Jelly, urchin: Urchin, puffer: Puffer, eel: Eel, clam: Clam, mine: Mine, spike: Spike, spinner: Spinner, shark: Shark, angler: Angler, boss: Boss };
 
 export function makeEnemy(d, W) {
   const C = TYPES[d.type];

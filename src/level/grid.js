@@ -1,6 +1,6 @@
 // Tile grid + seeded RNG + BFS helpers (pure, no DOM — also used by tools/validate.mjs)
 
-export const T = { WATER: 0, ROCK: 1, CRACK: 2, DOOR0: 3, DOOR1: 4, DOOR2: 5 };
+export const T = { WATER: 0, ROCK: 1, CRACK: 2, DOOR0: 3, DOOR1: 4, DOOR2: 5, GATE: 6 };
 export const TILE = 16;
 
 export function mulberry32(a) {
@@ -70,7 +70,8 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 export { DIRS };
 
 // Breadth-first search. passable(tile, x, y) -> bool. Returns {dist, parent}
-export function bfs(g, starts, passable) {
+// links (optional): Map cellIndex -> [cellIndex] extra edges (portals)
+export function bfs(g, starts, passable, links) {
   const dist = new Int32Array(g.w * g.h).fill(-1);
   const parent = new Int32Array(g.w * g.h).fill(-1);
   const q = new Int32Array(g.w * g.h);
@@ -90,6 +91,11 @@ export function bfs(g, starts, passable) {
       if (!passable(g.t[j], nx, ny)) continue;
       dist[j] = dist[i] + 1; parent[j] = i; q[qt++] = j;
     }
+    if (links && links.has(i))
+      for (const j of links.get(i)) {
+        if (dist[j] !== -1 || !passable(g.t[j], j % g.w, (j / g.w) | 0)) continue;
+        dist[j] = dist[i] + 1; parent[j] = i; q[qt++] = j;
+      }
   }
   return { dist, parent };
 }

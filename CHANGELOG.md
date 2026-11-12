@@ -1,5 +1,14 @@
 # Changelog
 
+## v4.0 — Chapter 2: The Deep Cities (levels 51–75)
+- 25 brand-new levels in three new worlds: Neon Atlantis, Toxic Trench and the Submarine Base, with new layouts (city blocks with gate walls, vertical climbs, hub rooms, temple rings, pipe mazes, twin halves, escape tunnels, boss arenas).
+- New mechanics: timed switch gates, linked teleport portals, whirlpools, crushers/pistons, acid pools, escape levels with a chasing flood/collapse/fire, rescue missions (free trapped baby turtles and bring them to the exit).
+- Harpoon gun: collect harpoon bundles, fire with C / the FIRE button.
+- New enemies: energy turrets, electric zappers, sludge blobs, toxic gas vents, patrol drones.
+- Five bosses with health bars: Crab King (55), Puffer Overlord (60), Hydra (65), Mecha Shark (70) and the Kraken (75).
+- Diver abilities: TURTLE shell blocks a hit every 10 s, SHARKY double dash, LANTERN reveals all secrets on the map, GOLDEN gem magnet.
+- Level select has 3 pages. Levels 1–50 are unchanged (fingerprint-locked); 51–75 are now locked too.
+
 ## v3.9.1
 - Google sign-in window now opens straight from the tap (touchend), so iPhone no longer blocks it; the button never stays stuck on CONNECTING (shows TAP TO TRY AGAIN / FAILED - TAP TO RETRY).
 

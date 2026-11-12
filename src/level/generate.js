@@ -2,10 +2,12 @@
 import { Grid, RNG, T, TILE, bfs, passWater, passAll, DIRS } from './grid.js';
 import { ARCH, roughen, bumps } from './archetypes.js';
 import { validateLevel } from './validate.js';
+import { generateLevel2 } from './generate2.js';
 
 const GEOMETRIC = new Set(['maze', 'spiral', 'wreck']);
 
 export function generateLevel(spec) {
+  if (spec.chapter === 2) return generateLevel2(spec);
   let lastErr = null;
   for (let attempt = 0; attempt < 24; attempt++) {
     try {
@@ -19,9 +21,9 @@ export function generateLevel(spec) {
   throw new Error(`Level ${spec.id} "${spec.name}" failed to generate: ${lastErr}`);
 }
 
-const px = (c) => c * TILE + TILE / 2;
+export const px = (c) => c * TILE + TILE / 2;
 
-function removeNarrow(g) {
+export function removeNarrow(g) {
   const keep = new Uint8Array(g.w * g.h);
   for (let y = 0; y < g.h - 1; y++)
     for (let x = 0; x < g.w - 1; x++)
@@ -31,9 +33,9 @@ function removeNarrow(g) {
   for (let i = 0; i < g.t.length; i++) if (g.t[i] === T.WATER && !keep[i]) g.t[i] = T.ROCK;
 }
 
-const is2x2 = (g, x, y) => g.open(x, y) && g.open(x + 1, y) && g.open(x, y + 1) && g.open(x + 1, y + 1);
+export const is2x2 = (g, x, y) => g.open(x, y) && g.open(x + 1, y) && g.open(x, y + 1) && g.open(x + 1, y + 1);
 
-function nearest2x2(g, x, y) {
+export function nearest2x2(g, x, y) {
   for (let r = 0; r < Math.max(g.w, g.h); r++)
     for (let dy = -r; dy <= r; dy++)
       for (let dx = -r; dx <= r; dx++) {
@@ -43,25 +45,25 @@ function nearest2x2(g, x, y) {
   return null;
 }
 
-function hRun(g, x, y) {
+export function hRun(g, x, y) {
   let a = x, b = x;
   while (g.open(a - 1, y)) a--;
   while (g.open(b + 1, y)) b++;
   return [a, b];
 }
-function vRun(g, x, y) {
+export function vRun(g, x, y) {
   let a = y, b = y;
   while (g.open(x, a - 1)) a--;
   while (g.open(x, b + 1)) b++;
   return [a, b];
 }
 
-function boxOpen(g, x, y, r) {
+export function boxOpen(g, x, y, r) {
   for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!g.open(x + dx, y + dy)) return false;
   return true;
 }
 
-function bfsDepth(g, start, maxD, pass) {
+export function bfsDepth(g, start, maxD, pass) {
   const out = [];
   const seen = new Map();
   const q = [[start.x, start.y, 0]];

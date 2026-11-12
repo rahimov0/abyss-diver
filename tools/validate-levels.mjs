@@ -33,6 +33,14 @@ for (const spec of LEVELS) {
     if (L.currents.length < spec.currents) warn.push(`currents ${L.currents.length}/${spec.currents}`);
     if (L.vents.length < spec.vents) warn.push(`vents ${L.vents.length}/${spec.vents}`);
     let cracks = 0; for (const t of L.tiles) if (t === T.CRACK) cracks++;
+    if (spec.chapter === 2) {
+      if (L.gates.length < spec.gates) warn.push(`gates ${L.gates.length}/${spec.gates}`);
+      const vaults = spec.arch === 'twin' ? 0 : spec.portals;
+      if (spec.arch !== 'twin' && L.portals.length < vaults) warn.push(`vaults ${L.portals.length}/${vaults}`);
+      if (L.whirls.length < spec.whirl) warn.push(`whirls ${L.whirls.length}/${spec.whirl}`);
+      if (L.crushers.length < spec.crush) warn.push(`crushers ${L.crushers.length}/${spec.crush}`);
+      if (spec.acid && !L.acid.length) warn.push('no acid');
+    }
     const fp = fingerprint(L);
     if (UPDATE) snaps[spec.id] = fp;
     else if (snaps[spec.id] && snaps[spec.id] !== fp) { changed++; warn.push('LEVEL CHANGED (locked!)'); }

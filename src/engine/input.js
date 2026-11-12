@@ -161,6 +161,8 @@ export class Input {
     return q || this.pressed.has('Space') || this.pressed.has('KeyX') || this.pressed.has('KeyJ') || this.pressed.has('KeyK');
   }
 
+  fire() { return this.pressed.has('KeyC') || this.pressed.has('KeyF') || this.pressed.has('KeyL'); }
+
   hit(code) { return this.pressed.has(code); }
   confirm() { return this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyZ'); }
   back() { return this.pressed.has('Escape') || this.pressed.has('Backspace'); }
