@@ -78,6 +78,7 @@ class Zapper extends Base {
 
 // ---------- hopping toxic blob ----------
 class Sludge extends Base {
+  light() { return W_LIGHT(this, 14, 0.5); }
   constructor(d, W) {
     super(d, W);
     this.x0 = d.x0 * TILE + 6; this.x1 = d.x1 * TILE + 10; this.floor = d.ty * TILE + TILE;
@@ -126,6 +127,7 @@ class GasVent extends Base {
     if (this.warn && this.t % 6 === 0) W.parts.push({ x: this.x + rnd(-3, 3), y: this.y - 3, vx: 0, vy: -0.4, life: 20, max: 20, type: 'spark', color: '#b6ff3a', sz: 1 });
   }
   touches(x, y, r) { return this.on && Math.abs(x - this.x) < 6 + r && y < this.y && y > this.top; }
+  light() { return this.on || this.warn ? { x: this.x, y: this.y - 20, r: 30, a: 0.6 } : { x: this.x, y: this.y - 3, r: 12, a: 0.5 }; }
   draw(ctx) {
     const x = Math.round(this.x), y = this.y;
     if (this.on) { ctx.fillStyle = 'rgba(160,255,60,0.18)'; ctx.fillRect(x - 6, this.top, 12, y - this.top); }
@@ -147,7 +149,7 @@ class Drone extends Base {
     const p = W.player;
     if (this.cool > 0) this.cool--;
     if (this.aim > 0) {
-      if (--this.aim === 0) { shoot(W, this.x, this.y + 2, p.x, p.y, 2.0 * this.spd, { col: '#ff4040', r: 2 }); W.sfx('pearl'); this.cool = 130 / this.spd; }
+      if (--this.aim === 0) { shoot(W, this.x, this.y + 2, p.x, p.y, 1.45 * this.spd, { col: '#ff4040', r: 2 }); W.sfx('pearl'); this.cool = 170 / this.spd; }
     } else {
       this.x += this.dir * 0.55 * this.spd;
       if (this.x < this.x0) { this.x = this.x0; this.dir = 1; }

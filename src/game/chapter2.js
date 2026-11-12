@@ -353,6 +353,14 @@ export class Ch2 {
     for (const q of this.pups) out.push({ x: q.x, y: q.y, r: 14, a: 0.5 });
     for (const h of this.harpoons) if (!h.got) out.push({ x: h.x, y: h.y, r: 12, a: 0.5 });
     for (const g of this.gates) if (!g.open) { const c = g.cells[0]; out.push({ x: c.tx * 16 + 8, y: c.ty * 16 + 8, r: 22, a: 0.5 }); }
+    // hazards always glow so darkness never hides them
+    for (const c of this.acid) out.push({ x: c.x + 8, y: c.y + 12, r: 16, a: 0.55 });
+    for (const w of this.whirls) out.push({ x: w.x, y: w.y, r: 30, a: 0.5 });
+    for (const c of this.crushers) {
+      const r = this.crusherRect(c), mid = (c.a + c.b) / 2;
+      out.push(c.dir === 'v' ? { x: c.x, y: r ? r.y + r.h : c.a, r: 24, a: 0.6 } : { x: r ? r.x + r.w : c.a, y: c.y, r: 24, a: 0.6 });
+      out.push(c.dir === 'v' ? { x: c.x, y: mid, r: 20, a: 0.3 } : { x: mid, y: c.y, r: 20, a: 0.3 });
+    }
     return out;
   }
 

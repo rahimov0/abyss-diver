@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.1
+- Levels 66–74 made fairer after playtesting (66 Dead Reef most of all): more air time, more air bubbles, slightly slower enemies, fewer crushers/drones, bigger lamp in the dark levels. 66 has no shark anymore and a simpler layout.
+- Drone shots are slower than the diver now and come less often.
+- Hazards (acid, crushers, whirlpools, gas vents, sludge) glow in dark levels so you can always see them.
+- Levels 1–65 and the bosses (70, 75) unchanged.
+
 ## v4.0 — Chapter 2: The Deep Cities (levels 51–75)
 - 25 brand-new levels in three new worlds: Neon Atlantis, Toxic Trench and the Submarine Base, with new layouts (city blocks with gate walls, vertical climbs, hub rooms, temple rings, pipe mazes, twin halves, escape tunnels, boss arenas).
 - New mechanics: timed switch gates, linked teleport portals, whirlpools, crushers/pistons, acid pools, escape levels with a chasing flood/collapse/fire, rescue missions (free trapped baby turtles and bring them to the exit).
