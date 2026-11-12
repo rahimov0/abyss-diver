@@ -151,7 +151,7 @@ export class Ch2 {
     for (const h of this.harpoons) {
       if (h.got) { if (h.respawn && --h.cd <= 0) h.got = false; continue; }
       if (Math.hypot(p.x - h.x, p.y - h.y) < 12 && !p.dead) {
-        h.got = true; h.cd = 600; W.ammo += 4; W.sfx('key');
+        h.got = true; h.cd = 420; W.ammo += 4; W.sfx('key');
         W.popup('+4 HARPOONS', h.x, h.y - 14, '#ffd23f');
         if (!W.game.tipHarpoon) { W.game.tipHarpoon = true; W.popup(W.game.input.touchUI ? 'TAP FIRE TO SHOOT' : 'PRESS C TO SHOOT', p.x, p.y - 26, '#ffffff'); }
       }

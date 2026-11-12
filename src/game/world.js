@@ -39,7 +39,7 @@ export class World {
     this.enemies = L.enemies.map((d) => makeEnemy(d, this)).filter(Boolean);
     this.boss = this.enemies.find((e) => e.type === 'boss') || null;
     this.boss2 = this.enemies.find((e) => e.boss2) || null;
-    this.ammo = spec.boss ? 6 : 0; this.harps = []; this.fireCD = 0; this.inkT = 0; this.exitMsgT = 0;
+    this.ammo = spec.boss ? 8 : 0; this.harps = []; this.fireCD = 0; this.inkT = 0; this.exitMsgT = 0;
     this.currents = L.currents.map((c) => ({ ...c, st: Array.from({ length: Math.max(4, Math.floor((c.w * c.h) / 260)) }, () => ({ x: rnd(0, c.w), y: rnd(0, c.h), l: rnd(3, 7) })) }));
     this.vents = L.vents.map((v) => ({ ...v, t: Math.random() * 60 }));
     this.deco = L.deco;
@@ -464,14 +464,23 @@ export class World {
       else if (this.fireCD <= 0) {
         const a = input.axis();
         let dx = a.x, dy = a.y;
-        const m = Math.hypot(dx, dy);
-        if (m < 0.3) { dx = p.face; dy = 0; } else { dx /= m; dy /= m; }
-        this.harps.push({ x: p.x + dx * 8, y: p.y + dy * 8, vx: dx * 5.5, vy: dy * 5.5, life: 48 });
+        const m = Math.hypot(dx, dy), stick = m >= 0.3;
+        if (!stick) { dx = p.face; dy = 0; } else { dx /= m; dy /= m; }
+        // aim assist: lock onto the best target in front of you (or anywhere if you're not steering)
+        const tgt = this.harpoonTarget(dx, dy, stick);
+        if (tgt) { const pt = tgt.pt(), d = Math.hypot(pt.x - p.x, pt.y - p.y) || 1; dx = (pt.x - p.x) / d; dy = (pt.y - p.y) / d; p.face = dx < 0 ? -1 : 1; }
+        this.harps.push({ x: p.x + dx * 8, y: p.y + dy * 8, vx: dx * 5.5, vy: dy * 5.5, life: 52, tgt });
         this.ammo--; this.fireCD = 14; this.sfx('dash');
         p.vx -= dx * 0.6; p.vy -= dy * 0.6;
       }
     }
     for (const h of this.harps) {
+      if (h.tgt && h.tgt.alive()) { // gentle homing so a moving target still gets hit
+        const pt = h.tgt.pt(), sp = Math.hypot(h.vx, h.vy), b = Math.atan2(h.vy, h.vx);
+        let da = Math.atan2(pt.y - h.y, pt.x - h.x) - b; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+        const nb = b + Math.max(-0.12, Math.min(0.12, da));
+        h.vx = Math.cos(nb) * sp; h.vy = Math.sin(nb) * sp;
+      }
       for (let k = 0; k < 2 && h.life > 0; k++) {
         h.x += h.vx / 2; h.y += h.vy / 2;
         if (this.solidAt(h.x, h.y)) { h.life = 0; this.burst(h.x - h.vx, h.y - h.vy, 'spark', 5, '#c8d0e0'); this.sfx('bounce'); break; }
@@ -490,6 +499,30 @@ export class World {
       h.life--;
     }
     this.harps = this.harps.filter((h) => h.life > 0);
+  }
+
+  harpoonTarget(dx, dy, stick) {
+    const p = this.player, list = [];
+    for (const e of this.enemies) {
+      if (!e.alive || e.type === 'gasvent' || NO_HARP.has(e.type)) continue;
+      if (e.boss2) { if (!e.dying) list.push({ pt: () => e.aimPoint(this), alive: () => e.alive && !e.dying, boss: true }); continue; }
+      list.push({ pt: () => ({ x: e.x, y: e.y }), alive: () => e.alive });
+    }
+    for (const s of this.shots) if (s.killable) list.push({ pt: () => ({ x: s.x, y: s.y }), alive: () => s.life > 0 });
+    // prefer targets in the direction you're pointing; if there are none, take the closest one anywhere
+    const pick = (minCos) => {
+      let best = null, bs = 1e9;
+      for (const c of list) {
+        const pt = c.pt(), vx = pt.x - p.x, vy = pt.y - p.y, d = Math.hypot(vx, vy);
+        if (d > 220 || d < 1) continue;
+        const cos = (vx * dx + vy * dy) / d;
+        if (cos < minCos || !this.los(p.x, p.y, pt.x, pt.y, 6)) continue;
+        const score = d * (2 - cos) * (c.boss ? 0.5 : 1);
+        if (score < bs) { bs = score; best = c; }
+      }
+      return best;
+    };
+    return pick(stick ? 0.5 : -0.2) || pick(-1.01);
   }
 
   openExit() {

@@ -1,5 +1,12 @@
 # Changelog
 
+## v4.2
+- Harpoon aim assist: every shot locks onto the best target (in the direction you point, otherwise the nearest one) and curves gently after it.
+- Kraken (75) toned down: 14 HP instead of 20, its eye stays open longer and closes for shorter, arms glow red and shake before they strike, harpoons fly through the arms, fewer ink attacks.
+- Hydra: harpoons slip past the necks, only the heads and the body stop them.
+- Crab King and Mecha Shark only take harpoon damage in their weak moments (dizzy / crashed), so the fights stay fair with aim assist.
+- Boss levels start with 8 harpoons; harpoon bundles come back faster.
+
 ## v4.1
 - Levels 66–74 made fairer after playtesting (66 Dead Reef most of all): more air time, more air bubbles, slightly slower enemies, fewer crushers/drones, bigger lamp in the dark levels. 66 has no shark anymore and a simpler layout.
 - Drone shots are slower than the diver now and come less often.

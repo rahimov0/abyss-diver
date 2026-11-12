@@ -177,7 +177,7 @@ const BOSS_INFO = {
   pufferking: { name: 'PUFFER OVERLORD', hp: 12 },
   hydra: { name: 'HYDRA', hp: 12 },
   mechashark: { name: 'MECHA SHARK', hp: 14 },
-  kraken: { name: 'THE KRAKEN', hp: 20 },
+  kraken: { name: 'THE KRAKEN', hp: 14 },
 };
 
 class BossBase extends Base {
@@ -191,9 +191,10 @@ class BossBase extends Base {
   get armored() { return false; }
   get weak() { return false; }
   get phase2() { return this.hp <= this.maxHp / 2; }
+  aimPoint() { return { x: this.x, y: this.y }; }
   hit(W, dmg, x, y) {
     if (this.invT > 0 || this.dying) return;
-    this.hp = Math.max(0, this.hp - dmg); this.flash = 14; this.invT = 12;
+    this.hp = Math.max(0, this.hp - dmg); this.flash = 14; this.invT = 24;
     W.sfx(this.hp > 0 ? 'kill' : 'boom'); W.shake = Math.max(W.shake, 6); W.buzz(50);
     W.burst(x, y, 'spark', 14, '#ffffff');
     W.popup(dmg > 1 ? `-${dmg} CRITICAL!` : `-${dmg}`, x, y - 10, '#ffd23f');
@@ -222,7 +223,10 @@ class BossBase extends Base {
   }
   onHarpoon(W, h) {
     if (this.dying || !this.touches(h.x, h.y, 3)) return false;
-    if (this.armored) { W.sfx('bounce'); W.burst(h.x, h.y, 'spark', 6, '#c8d0e0'); W.popup('ARMORED!', h.x, h.y - 8, '#9aa4b8'); }
+    if (this.armored) {
+      W.sfx('bounce'); W.burst(h.x, h.y, 'spark', 6, '#c8d0e0');
+      if (!this.tipT || this.t - this.tipT > 90) { this.tipT = this.t; W.popup({ crabking: 'WAIT TILL HE IS DIZZY', mechashark: 'MAKE IT CRASH FIRST', pufferking: 'WAIT TILL HE SHRINKS' }[this.kind] || 'ARMORED!', h.x, h.y - 8, '#9aa4b8'); }
+    }
     else this.hit(W, 1, h.x, h.y);
     return true;
   }
@@ -243,7 +247,7 @@ class CrabKing extends BossBase {
     this.state = 'walk'; this.timer = 120; this.face = 1;
   }
   get weak() { return this.state === 'dizzy'; }
-  get armored() { return this.state === 'jump'; }
+  get armored() { return this.state !== 'dizzy'; } // shell is only open while he's dizzy
   touches(x, y, r) { return Math.abs(x - this.x) < 20 + r && Math.abs(y - this.y) < 11 + r; }
   update(W) {
     if (super.update(W)) return;
@@ -369,6 +373,11 @@ class Hydra extends BossBase {
   }
   get armored() { return true; }
   base(h) { return { x: this.x + h.k * 12, y: this.y - 8 }; }
+  aimPoint(W) {
+    let best = null, bd = 1e9;
+    for (const h of this.heads) if (h.hp > 0) { const d = Math.hypot(h.x - W.player.x, h.y - W.player.y); if (d < bd) { bd = d; best = h; } }
+    return best ? { x: best.x, y: best.y } : { x: this.x, y: this.y };
+  }
   rest(h) { return { x: this.x + h.k * 38 + Math.sin(this.t * 0.03 + h.k) * 10, y: this.y - 64 + Math.cos(this.t * 0.04 + h.k * 2) * 8 - (h.k === 0 ? 14 : 0) }; }
   touches(x, y, r) {
     if (Math.abs(x - this.x) < 22 + r && Math.abs(y - this.y) < 14 + r) return true;
@@ -397,8 +406,10 @@ class Hydra extends BossBase {
   }
   onHarpoon(W, s) {
     if (this.dying) return false;
-    for (const h of this.heads) if (h.hp > 0 && dist(s.x, s.y, h.x, h.y) < 10) { this.hitHead(W, h, 1); return true; }
-    return super.onHarpoon(W, s);
+    for (const h of this.heads) if (h.hp > 0 && dist(s.x, s.y, h.x, h.y) < 11) { this.hitHead(W, h, 1); return true; }
+    // only the body blocks harpoons; they slip past the necks
+    if (Math.abs(s.x - this.x) < 22 && Math.abs(s.y - this.y) < 13) { W.sfx('bounce'); if (!this.tipT || this.t - this.tipT > 90) { this.tipT = this.t; W.popup('HIT THE HEADS!', s.x, s.y - 8, '#9aa4b8'); } return true; }
+    return false;
   }
   update(W) {
     if (super.update(W)) return;
@@ -461,7 +472,7 @@ const W_PLAYER = { x: 0 };
 class MechaShark extends BossBase {
   constructor(d, W) { super(d, W); this.state = 'roam'; this.timer = 120; this.vx = 0; this.vy = 0; this.face = 1; this.cycles = 0; }
   get weak() { return this.state === 'stunned'; }
-  get armored() { return this.state === 'charge'; }
+  get armored() { return this.state !== 'stunned'; } // the core is only exposed after a crash
   touches(x, y, r) { return Math.abs(x - this.x) < 22 + r && Math.abs(y - this.y) < 9 + r; }
   update(W) {
     if (super.update(W)) return;
@@ -525,10 +536,11 @@ class Kraken extends BossBase {
     super(d, W);
     this.hx = this.x; this.hy = this.y - 30; this.y = this.hy;
     this.eye = 0; this.eyeT = 200; this.state = 'idle';
-    this.arms = Array.from({ length: 6 }, (_, i) => ({ i, a: Math.PI * (0.15 + (i / 5) * 0.7), len: 70, slam: 0, tx: 0, ty: 0, pts: [] }));
+    this.arms = Array.from({ length: 6 }, (_, i) => ({ i, a: Math.PI * (0.15 + (i / 5) * 0.7), len: 70, slam: 0, wind: 0, tx: 0, ty: 0, pts: [] }));
   }
-  get weak() { return this.eye > 0.7; }
-  get armored() { return this.eye < 0.7; }
+  get weak() { return this.eye > 0.5; }
+  get armored() { return this.eye < 0.5; }
+  aimPoint() { return { x: this.x, y: this.y + 1 }; }
   armPts(arm) {
     const pts = [], bx = this.x + Math.cos(arm.a) * 14, by = this.y + 10;
     let a = arm.a;
@@ -540,6 +552,7 @@ class Kraken extends BossBase {
       else {
         a = arm.a + Math.sin(this.t * 0.035 + arm.i * 1.3 + f * 3) * 0.5 * f;
         x = bx + Math.cos(a) * arm.len * f; y = by + Math.sin(a) * arm.len * f;
+        if (arm.wind > 0) { x += rnd(-2, 2) * f; y += rnd(-2, 2) * f; }
       }
       pts.push({ x, y, r: 5 - f * 3.5 });
     }
@@ -560,12 +573,11 @@ class Kraken extends BossBase {
   }
   onHarpoon(W, s) {
     if (this.dying) return false;
-    if (dist(s.x, s.y, this.x, this.y - 2) < 18) {
-      if (this.weak) this.hit(W, 1, s.x, s.y); else { W.sfx('bounce'); W.popup('WAIT FOR THE EYE!', s.x, s.y - 8, '#9aa4b8'); }
+    if (dist(s.x, s.y, this.x, this.y - 2) < 22) {
+      if (this.weak) this.hit(W, 1, s.x, s.y); else { W.sfx('bounce'); if (!this.tipT || this.t - this.tipT > 90) { this.tipT = this.t; W.popup('WAIT FOR THE EYE!', s.x, s.y - 8, '#9aa4b8'); } }
       return true;
     }
-    for (const arm of this.arms) for (const q of arm.pts) if (dist(s.x, s.y, q.x, q.y) < q.r + 2) { W.burst(s.x, s.y, 'spark', 4, '#ff8ad8'); arm.slam = 0; return true; }
-    return false;
+    return false; // harpoons fly through the arms
   }
   light() { return { x: this.x, y: this.y, r: 90, a: 0.85 }; }
   update(W) {
@@ -577,28 +589,32 @@ class Kraken extends BossBase {
     this.x += (tx - this.x) * 0.006 * sp; this.y += (ty - this.y) * 0.02;
     // eye cycle
     this.eyeT--;
-    if (this.eyeT <= 0) { if (this.state === 'idle') { this.state = 'open'; this.eyeT = ph2 ? 110 : 140; W.sfx('roar'); } else { this.state = 'idle'; this.eyeT = ph2 ? 170 : 210; } }
+    if (this.eyeT <= 0) { if (this.state === 'idle') { this.state = 'open'; this.eyeT = ph2 ? 170 : 200; W.sfx('roar'); W.popup('THE EYE IS OPEN!', this.x, this.y - 48, '#ffd23f'); } else { this.state = 'idle'; this.eyeT = ph2 ? 130 : 150; } }
     this.eye += ((this.state === 'open' ? 1 : 0) - this.eye) * 0.12;
     // arm slams
+    let busy = this.arms.filter((a) => a.slam > 0 || a.wind > 0).length;
     for (const arm of this.arms) {
       if (arm.slam > 0) { arm.slam--; continue; }
-      arm.len = 64 + Math.sin(this.t * 0.02 + arm.i) * 16;
-      if (Math.random() < (ph2 ? 0.006 : 0.004) * sp && dist(p.x, p.y, this.x, this.y) < 190) {
-        arm.slam = 50; arm.tx = p.x + rnd(-10, 10); arm.ty = p.y + rnd(-10, 10);
-        const d = dist(arm.tx, arm.ty, this.x, this.y); if (d > 170) { arm.tx = this.x + (arm.tx - this.x) * 170 / d; arm.ty = this.y + (arm.ty - this.y) * 170 / d; }
-        W.sfx('crack');
+      arm.len = 60 + Math.sin(this.t * 0.02 + arm.i) * 14;
+      if (arm.wind > 0) { // the arm shakes and glows before it strikes
+        if (--arm.wind === 0) { arm.slam = 45; W.sfx('crack'); }
+        continue;
+      }
+      if (busy < (ph2 ? 2 : 1) && Math.random() < (ph2 ? 0.004 : 0.003) * sp && dist(p.x, p.y, this.x, this.y) < 180) {
+        arm.wind = 40; busy++; arm.tx = p.x + rnd(-8, 8); arm.ty = p.y + rnd(-8, 8);
+        const d = dist(arm.tx, arm.ty, this.x, this.y); if (d > 150) { arm.tx = this.x + (arm.tx - this.x) * 150 / d; arm.ty = this.y + (arm.ty - this.y) * 150 / d; }
       }
     }
     // ink balls in the second phase
-    if (ph2 && this.t % 150 === 0) { for (let i = -1; i <= 1; i++) shoot(W, this.x, this.y + 8, p.x + i * 28, p.y, 1.4, { col: '#2a1a40', r: 4, life: 260 }); W.sfx('bubble'); }
-    if (this.t % 400 === 200) { W.inkT = 120; W.burst(this.x, this.y + 10, 'bubble', 20); }
+    if (ph2 && this.t % 220 === 0) { for (const i of [-1, 1]) shoot(W, this.x, this.y + 8, p.x + i * 24, p.y, 1.2, { col: '#6a3a9a', r: 4, life: 260, killable: true }); W.sfx('bubble'); }
+    if (this.t % 600 === 300) { W.inkT = 80; W.burst(this.x, this.y + 10, 'bubble', 20); }
   }
   draw(ctx) {
     this.fade(ctx);
     const x = Math.round(this.x), y = Math.round(this.y), f = this.fl();
     for (const arm of this.arms) {
       const pts = arm.pts;
-      for (let k = pts.length - 1; k >= 0; k--) { const q = pts[k]; disc(ctx, q.x, q.y, q.r + 1, '#0b0e1c'); disc(ctx, q.x, q.y, q.r, f ? '#ffffff' : arm.slam ? '#d04a8a' : '#a03a7a'); if (k % 2 === 0 && q.r > 2) px(ctx, q.x - 1, q.y + 1, '#ffb0d8', 2, 1); }
+      for (let k = pts.length - 1; k >= 0; k--) { const q = pts[k]; disc(ctx, q.x, q.y, q.r + 1, '#0b0e1c'); disc(ctx, q.x, q.y, q.r, f ? '#ffffff' : arm.slam ? '#d04a8a' : arm.wind > 0 && (arm.wind >> 2) % 2 ? '#ff6060' : '#a03a7a'); if (k % 2 === 0 && q.r > 2) px(ctx, q.x - 1, q.y + 1, '#ffb0d8', 2, 1); }
     }
     ellipse(ctx, x, y - 6, 22, 26, '#0b0e1c'); ellipse(ctx, x, y - 6, 21, 25, f ? '#ffffff' : '#b04a8a'); ellipse(ctx, x - 6, y - 16, 9, 10, '#c86aa0');
     for (let i = 0; i < 5; i++) px(ctx, x - 12 + i * 6, y - 26 + (i % 2) * 4, '#7a2a5a', 3, 3);
