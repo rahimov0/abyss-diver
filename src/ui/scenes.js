@@ -9,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V4.2';
+export const VERSION = 'V4.3';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -63,26 +63,36 @@ export function panel(ctx, x, y, w, h, fill = '#0b1430', border = '#3aaee0') {
 }
 
 class Menu {
-  constructor(game, items) { this.game = game; this.items = items; this.sel = 0; this.rects = []; }
+  constructor(game, items) { this.game = game; this.items = items; this.sel = 0; this.rects = []; this.rows = items.length; }
   update(input) {
     const n = this.items.length;
     if (input.hit('ArrowUp') || input.hit('KeyW')) { this.sel = (this.sel + n - 1) % n; this.game.audio.play('click'); }
     if (input.hit('ArrowDown') || input.hit('KeyS')) { this.sel = (this.sel + 1) % n; this.game.audio.play('click'); }
+    if (this.rows < n && (input.hit('ArrowRight') || input.hit('KeyD') || input.hit('ArrowLeft') || input.hit('KeyA'))) {
+      this.sel = this.sel < this.rows ? Math.min(n - 1, this.sel + this.rows) : this.sel - this.rows; this.game.audio.play('click');
+    }
+    // mouse: hovering highlights the button
+    const h = input.hover;
+    if (h && h.moved) this.rects.forEach((r, i) => { if (i !== this.sel && h.x >= r.x && h.x <= r.x + r.w && h.y >= r.y && h.y <= r.y + r.h) this.sel = i; });
     if (input.confirm()) { this.game.audio.play('select'); this.items[this.sel].act(); return; }
     for (const tp of input.taps)
       this.rects.forEach((r, i) => {
         if (tp.x >= r.x && tp.x <= r.x + r.w && tp.y >= r.y && tp.y <= r.y + r.h) { this.sel = i; this.game.audio.play('select'); this.items[i].act(); }
       });
   }
-  draw(ctx, cx, y, w = 120, h = 15, gap = 4, t = 0) {
+  draw(ctx, cx, y, w = 120, h = 15, gap = 4, t = 0, cols = 1) {
     this.rects = [];
+    const n = this.items.length, rows = Math.ceil(n / cols), cg = 8;
+    this.rows = rows;
     this.items.forEach((it, i) => {
-      const x = Math.round(cx - w / 2), yy = y + i * (h + gap);
+      const col = Math.floor(i / rows), row = i % rows;
+      const x = Math.round(cx - (cols * w + (cols - 1) * cg) / 2 + col * (w + cg)), yy = y + row * (h + gap);
       const on = i === this.sel;
       panel(ctx, x, yy, w, h, on ? '#1a3a6a' : '#0b1430', on ? '#ffd23f' : '#3aaee0');
-      drawText(ctx, typeof it.label === 'function' ? it.label() : it.label, cx, yy + Math.floor((h - 5) / 2), on ? '#ffd23f' : '#d8f4ff', { align: 'center' });
+      drawText(ctx, typeof it.label === 'function' ? it.label() : it.label, x + Math.round(w / 2), yy + Math.floor((h - 5) / 2), on ? '#ffd23f' : '#d8f4ff', { align: 'center' });
       if (on && (t >> 4) % 2) drawText(ctx, '>', x + 5, yy + Math.floor((h - 5) / 2), '#ffd23f');
       this.rects.push({ x, y: yy, w, h });
+      this.game.input.cursorRects.push({ x, y: yy, w, h });
     });
   }
 }
@@ -95,19 +105,26 @@ const CONTROL_HELP = {
   swipe: ['LEFT: SLIDE FINGER TO SWIM', 'RIGHT: DASH'],
 };
 const VIEW_NAMES = { normal: 'NORMAL', wide: 'WIDE', close: 'CLOSE' };
+const BTN_NAMES = { small: 'SMALL', normal: 'NORMAL', big: 'BIG' };
+// keyboard help for computers
+export const KEY_HELP = ['ARROWS / WASD: SWIM   SPACE: DASH', 'C: HARPOON   M: MAP   ESC: PAUSE'];
+export const onComputer = (game) => game.device === 'desktop' && !game.input.touchUI;
 function cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
 
 function settingsMenu(game, back) {
   const s = game.save;
   const save = () => writeSave(s);
+  const pc = onComputer(game); // touch-only options are hidden on computers
   return new Menu(game, [
-    { label: () => `CONTROLS  ${CONTROL_NAMES[s.controls]}`, act: () => { s.controls = cycle(['stick', 'dpad', 'swipe'], s.controls); game.input.ctrl = s.controls; save(); } },
+    ...(pc ? [] : [{ label: () => `CONTROLS  ${CONTROL_NAMES[s.controls]}`, act: () => { s.controls = cycle(['stick', 'dpad', 'swipe'], s.controls); game.input.ctrl = s.controls; save(); } }]),
     { label: () => `VIEW  ${VIEW_NAMES[s.view]}`, act: () => { s.view = cycle(['normal', 'wide', 'close'], s.view); save(); game.resize(); } },
+    ...(pc ? [] : [{ label: () => `BUTTONS  ${BTN_NAMES[s.buttons] || 'NORMAL'}`, act: () => { s.buttons = cycle(['small', 'normal', 'big'], s.buttons || 'normal'); game.input.btn = { small: 0.85, normal: 1, big: 1.25 }[s.buttons]; save(); } }]),
+    ...(game.canFullscreen ? [{ label: () => `FULL SCREEN  ${game.isFullscreen ? 'ON' : 'OFF'}`, act: () => game.toggleFullscreen(), gesture: true }] : []),
     { label: () => `MINI MAP  ${s.minimap ? 'ON' : 'OFF'}`, act: () => { s.minimap = !s.minimap; save(); } },
     { label: () => `VIBRATION  ${s.vibrate !== false ? 'ON' : 'OFF'}`, act: () => { s.vibrate = s.vibrate === false; save(); if (s.vibrate) try { navigator.vibrate && navigator.vibrate(40); } catch { /* */ } } },
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
-    { label: () => accountLabel(game), act: () => accountAction(game) },
+    { label: () => accountLabel(game), act: () => accountAction(game), gesture: true },
     { label: 'BACK', act: back },
   ]);
 }
@@ -138,16 +155,24 @@ export function cloudBadge(game) {
 }
 
 function drawSettings(ctx, game, menu, t) {
-  const v = game.view, s = game.save;
-  drawText(ctx, 'SETTINGS', v.w / 2, Math.max(8, v.h / 2 - 92), '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
-  const y = Math.max(26, v.h / 2 - 70);
-  menu.draw(ctx, v.w / 2, y, 140, 15, 4, t);
-  // the Google button runs straight from the touch event, otherwise iPhone blocks the sign-in window
-  const ai = menu.items.length - 2, ar = menu.rects[ai];
-  if (ar) game.input.gestureRects.push({ ...ar, fn: () => { menu.sel = ai; game.audio.play('select'); accountAction(game); } });
-  const hy = y + menu.items.length * 19 + 6;
-  CONTROL_HELP[s.controls].forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
-  drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 20, '#5d6478', { align: 'center', outline: '#0b0e1c' });
+  const v = game.view, s = game.save, n = menu.items.length;
+  // one column when it fits, otherwise two side by side (phones held sideways)
+  const cols = n * 19 + 70 > v.h && v.w >= 290 ? 2 : 1;
+  const rows = Math.ceil(n / cols), bh = cols === 1 && n * 19 + 60 > v.h ? 13 : 15, step = bh + 4;
+  const total = 24 + rows * step + 28;
+  const top = Math.max(4, Math.round((v.h - total) / 2));
+  drawText(ctx, 'SETTINGS', v.w / 2, top, '#ffd23f', { align: 'center', scale: 2, outline: '#0b0e1c' });
+  const y = top + 20;
+  menu.draw(ctx, v.w / 2, y, cols === 2 ? 132 : 140, bh, 4, t, cols);
+  // these buttons run straight from the touch event (Google sign-in window, full screen), or the browser blocks them
+  menu.items.forEach((it, i) => {
+    const r = menu.rects[i];
+    if (it.gesture && r) game.input.gestureRects.push({ ...r, fn: () => { menu.sel = i; game.audio.play('select'); it.act(); } });
+  });
+  const hy = y + rows * step + 4;
+  const help = onComputer(game) ? KEY_HELP : CONTROL_HELP[s.controls];
+  help.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
+  if (hy + 26 < v.h) drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 18, '#5d6478', { align: 'center', outline: '#0b0e1c' });
 }
 
 // animated underwater backdrop for menus
@@ -217,6 +242,12 @@ export class TitleScene {
   draw(ctx) {
     const v = this.game.view, t = this.t;
     backdrop(ctx, v, t, this.S);
+    if (this.mode === 'settings') {
+      ctx.fillStyle = 'rgba(3,5,14,0.75)'; ctx.fillRect(0, 0, v.w, v.h);
+      drawSettings(ctx, this.game, this.settings, t);
+      drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
+      return;
+    }
     const compact = v.h < 300; // landscape phones
     const ty = compact ? 6 : Math.max(18, Math.round(v.h / 2 - 150));
     const ls = compact ? 3 : 4;
@@ -246,6 +277,13 @@ export class TitleScene {
     if (cb) drawText(ctx, cb[0], 4, v.h - 16, cb[1], { outline: '#0b0e1c' });
     drawText(ctx, VERSION, v.w - 4, v.h - 8, '#d8f4ff', { align: 'right', outline: '#0b0e1c' });
     const mb = this.menu.rects.length ? this.menu.rects[this.menu.rects.length - 1].y + 15 : 0;
+    if (onComputer(this.game)) { // keyboard help on computers
+      const hy = Math.min(v.h - 40, mb + 10);
+      if (hy > mb + 2) KEY_HELP.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, '#d8f4ff', { align: 'center', outline: '#0b0e1c' }));
+    } else if (this.game.device === 'phone' && v.h > v.w * 1.3 && !window.IOS_BROWSER && v.h - 34 > mb + 4) {
+      drawText(ctx, 'TIP: TURN YOUR PHONE SIDEWAYS', v.w / 2, v.h - 34, '#fff3a0', { align: 'center', outline: '#0b0e1c' });
+      drawText(ctx, 'TO SEE MORE OF THE CAVE', v.w / 2, v.h - 26, '#fff3a0', { align: 'center', outline: '#0b0e1c' });
+    }
     if (window.IOS_BROWSER && v.h - 34 > mb + 4) {
       const lines = ['FULL SCREEN: TAP SHARE', 'THEN ADD TO HOME SCREEN'];
       lines.forEach((l, i) => drawText(ctx, l, v.w / 2, v.h - 34 + i * 8, (t >> 5) % 2 ? '#ffffff' : '#fff3a0', { align: 'center', outline: '#0b0e1c' }));
@@ -281,9 +319,13 @@ export class SelectScene {
       const fwd = Math.abs(sw.dx) > Math.abs(sw.dy) ? sw.dx < 0 : sw.dy < 0;
       this.setPage(this.page + (fwd ? 1 : -1));
     }
+    const h = input.hover;
+    if (h && h.moved) for (const r of this.rects) if (r.id !== undefined && r.id !== this.sel && h.x >= r.x && h.x <= r.x + r.w && h.y >= r.y && h.y <= r.y + r.h) this.sel = r.id;
     for (const tp of input.taps)
       for (const r of this.rects)
         if (tp.x >= r.x && tp.x <= r.x + r.w && tp.y >= r.y && tp.y <= r.y + r.h) {
+          // mouse: clicking a level opens it (touch still needs the PLAY button)
+          if (r.id !== undefined && h && !input.touchUI && r.id < max) { this.sel = r.id; g.audio.play('select'); g.play(r.id + 1); return; }
           if (r.act === 'prev') this.setPage(this.page - 1);
           else if (r.act === 'next') this.setPage(this.page + 1);
           else if (r.act === 'back') { g.audio.play('click'); g.setScene(new TitleScene(g)); }
@@ -349,7 +391,8 @@ export class SelectScene {
     btn('<', cx0, 24, 'prev');
     btn('BACK', mid - 28, 56, 'back');
     btn('>', cx0 + cw - 24, 24, 'next');
-    drawText(ctx, `PAGE ${this.page + 1}/${PAGES}  -  SWIPE TO TURN`, mid, by + 19, '#9aa4b8', { align: 'center' });
+    drawText(ctx, `PAGE ${this.page + 1}/${PAGES}  -  ${this.game.input.touchUI || !this.game.input.hover ? 'SWIPE TO TURN' : 'CLICK A LEVEL TO PLAY'}`, mid, by + 19, '#9aa4b8', { align: 'center' });
+    for (const r of this.rects) this.game.input.cursorRects.push(r);
   }
 }
 
@@ -409,6 +452,7 @@ export class DiverScene {
     panel(ctx, v.w / 2 - 28, by, 56, 15);
     drawText(ctx, 'BACK', v.w / 2, by + 5, '#d8f4ff', { align: 'center' });
     this.rects.push({ x: v.w / 2 - 28, y: by, w: 56, h: 15, act: 'back' });
+    for (const r of this.rects) this.game.input.cursorRects.push(r);
   }
 }
 
@@ -639,7 +683,7 @@ export class PlayScene {
     const mr = this.drawMiniMap(ctx);
     this.game.input.hot = [{ ...pr, code: 'Escape' }, { ...mr, code: 'KeyM' }];
     const fireBtn = this.game.input.touchUI && this.mode === 'play' && W.ch2 && (W.ammo > 0 || W.ch2.harpoons.length);
-    if (fireBtn) this.game.input.hot.push({ x: v.w - 70, y: v.h - 74, w: 24, h: 24, code: 'KeyC' });
+    if (fireBtn) { const f = this.game.input.fireButton(); this.game.input.hot.push({ x: f.x - f.r, y: f.y - f.r, w: f.r * 2, h: f.r * 2, code: 'KeyC' }); }
     // dash cooldown + touch controls
     const inp = this.game.input;
     if (inp.touchUI && this.mode === 'play') {
@@ -652,8 +696,9 @@ export class PlayScene {
           ctx.fillStyle = on ? 'rgba(255,210,63,0.65)' : 'rgba(255,255,255,0.15)'; ctx.fillRect(r.x, r.y, r.w, r.h);
           ctx.fillStyle = on ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)'; ctx.fillRect(r.x, r.y, r.w, 2);
           const cx = r.x + r.w / 2, cy = r.y + r.h / 2, c = on ? '#ffffff' : 'rgba(255,255,255,0.75)';
-          if (r.dx) tri(ctx, cx + r.dx * 6, cy, cx - r.dx * 5, cy - 7, cx - r.dx * 5, cy + 7, c);
-          else tri(ctx, cx, cy + r.dy * 6, cx - 7, cy - r.dy * 5, cx + 7, cy - r.dy * 5, c);
+          const z = inp.btn;
+          if (r.dx) tri(ctx, cx + r.dx * 6 * z, cy, cx - r.dx * 5 * z, cy - 7 * z, cx - r.dx * 5 * z, cy + 7 * z, c);
+          else tri(ctx, cx, cy + r.dy * 6 * z, cx - 7 * z, cy - r.dy * 5 * z, cx + 7 * z, cy - r.dy * 5 * z, c);
         }
       } else if (inp.ctrl === 'swipe') { // slide anywhere on the left half
         if (inp.stick) {
@@ -672,17 +717,18 @@ export class PlayScene {
           const dx = inp.stick.x - b.x, dy = inp.stick.y - b.y, d = Math.hypot(dx, dy), m = Math.min(d, b.r - 6) / (d || 1);
           kx += dx * m; ky += dy * m;
         } else drawText(ctx, 'MOVE', b.x, b.y + b.r + 3 > v.h - 6 ? b.y - b.r - 8 : b.y + b.r + 3, 'rgba(255,255,255,0.35)', { align: 'center' });
-        disc(ctx, kx, ky, 9, 'rgba(11,14,28,0.5)');
-        disc(ctx, kx, ky, 8, inp.stick ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)');
+        const kr = Math.round(8 * inp.btn);
+        disc(ctx, kx, ky, kr + 1, 'rgba(11,14,28,0.5)');
+        disc(ctx, kx, ky, kr, inp.stick ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)');
       }
-      const bx = v.w - 30, by = v.h - 32, cd = W.player.charges <= 0;
-      disc(ctx, bx, by, 17, 'rgba(11,14,28,0.5)');
-      disc(ctx, bx, by, 15, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');
+      const db = inp.dashButton(), bx = db.x, by = db.y, cd = W.player.charges <= 0;
+      disc(ctx, bx, by, db.r, 'rgba(11,14,28,0.5)');
+      disc(ctx, bx, by, db.r - 2, inp.dashTouch ? 'rgba(255,210,63,0.6)' : cd ? 'rgba(90,100,120,0.45)' : 'rgba(255,210,63,0.35)');
       drawText(ctx, 'DASH', bx, by - 2, '#ffffff', { align: 'center' });
       if (fireBtn) {
-        const fx = v.w - 58, fy = v.h - 62;
-        disc(ctx, fx, fy, 13, 'rgba(11,14,28,0.5)');
-        disc(ctx, fx, fy, 11, W.ammo > 0 ? 'rgba(255,90,90,0.4)' : 'rgba(90,100,120,0.35)');
+        const fb = inp.fireButton(), fx = fb.x, fy = fb.y;
+        disc(ctx, fx, fy, fb.r, 'rgba(11,14,28,0.5)');
+        disc(ctx, fx, fy, fb.r - 2, W.ammo > 0 ? 'rgba(255,90,90,0.4)' : 'rgba(90,100,120,0.35)');
         drawText(ctx, 'FIRE', fx, fy - 5, '#ffffff', { align: 'center' });
         drawText(ctx, String(W.ammo), fx, fy + 1, W.ammo ? '#ffd23f' : '#9aa4b8', { align: 'center' });
       }
@@ -704,15 +750,17 @@ export class PlayScene {
       const a = Math.min(1, (170 - this.t) / 20);
       ctx.globalAlpha = Math.max(0, a);
       const tip = TIPS[this.id];
-      const lines = tip ? wrap(tip, v.w - 40) : [];
+      const pw = Math.min(v.w - 24, 300), px0 = Math.round((v.w - pw) / 2);
+      const keys = onComputer(this.game) && (this.id === 1 || this.id === 51 || this.id === 53) ? KEY_HELP : [];
+      const lines = (tip ? wrap(tip, pw - 16) : []).concat(keys.length ? [''] : [], keys);
       const h = 50 + lines.length * 8;
       const y = Math.round(v.h / 2 - h / 2);
-      panel(ctx, 12, y, v.w - 24, h, 'rgba(8,14,34,0.92)', B.surf[0]);
+      panel(ctx, px0, y, pw, h, 'rgba(8,14,34,0.92)', B.surf[0]);
       drawText(ctx, `LEVEL ${this.id}`, v.w / 2, y + 6, B.ui, { align: 'center' });
       drawText(ctx, this.spec.name, v.w / 2, y + 15, '#ffffff', { align: 'center', scale: 2, outline: '#0b0e1c' });
       const goal = this.spec.boss ? 'BOSS FIGHT' : this.spec.escape ? 'ESCAPE!' : this.spec.pups ? `${this.spec.gems} GEMS + ${this.spec.pups} BABIES` : `${this.spec.gems} GEMS`;
       drawText(ctx, `${B.name}  -  ${goal}`, v.w / 2, y + 31, '#9aa4b8', { align: 'center' });
-      lines.forEach((l, i) => drawText(ctx, l, v.w / 2, y + 42 + i * 8, '#fff3a0', { align: 'center' }));
+      lines.forEach((l, i) => drawText(ctx, l, v.w / 2, y + 42 + i * 8, keys.includes(l) ? '#d8f4ff' : '#fff3a0', { align: 'center' }));
       ctx.globalAlpha = 1;
     }
     if (this.mode === 'map') this.drawFullMap(ctx);

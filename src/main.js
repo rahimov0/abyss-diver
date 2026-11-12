@@ -25,6 +25,8 @@ class Game {
     addEventListener('resize', rs);
     addEventListener('orientationchange', rs);
     if (window.visualViewport) visualViewport.addEventListener('resize', rs);
+    document.addEventListener('fullscreenchange', rs);
+    this.input.btn = { small: 0.85, normal: 1, big: 1.25 }[this.save.buttons] || 1;
     blockZoom(canvas);
     this.scene = new TitleScene(this);
     // Phone back gesture / browser back button: pause -> main menu instead of leaving the site
@@ -46,11 +48,15 @@ class Game {
     const vw = r.width, vh = r.height;
     if (vw < 10 || vh < 10) return; // hidden / not laid out yet; the next resize event fixes it
     const pw = vw * dpr, ph = vh * dpr;
-    // VIEW setting: how many game pixels fit on the short side of the screen
-    const target = { normal: 192, wide: 240, close: 168 }[this.save.view] || 192;
+    // how many game pixels fit on the short side: phones keep the classic view,
+    // tablets and computers see more of the cave instead of getting giant pixels
+    const short = Math.min(vw, vh);
+    this.device = short < 520 ? 'phone' : COARSE ? 'tablet' : 'desktop';
+    const base = { phone: 192, tablet: 248, desktop: 256 }[this.device];
+    const target = Math.round(base * ({ normal: 1, wide: 1.25, close: 0.875 }[this.save.view] || 1));
     let s = Math.max(1, Math.floor(Math.min(pw, ph) / target));
     let W = Math.floor(pw / s), H = Math.floor(ph / s);
-    while (W > 520 || H > 560) { s++; W = Math.floor(pw / s); H = Math.floor(ph / s); }
+    while (W > 560 || H > 600) { s++; W = Math.floor(pw / s); H = Math.floor(ph / s); }
     this.canvas.width = W; this.canvas.height = H;
     const cw = (W * s) / dpr, ch = (H * s) / dpr;
     this.canvas.style.width = `${cw}px`;
@@ -60,6 +66,32 @@ class Game {
     this.view.w = W; this.view.h = H;
     this.ctx.imageSmoothingEnabled = false;
   }
+
+  // mouse: hand cursor over buttons, hidden while playing with the keyboard
+  updateCursor() {
+    const inp = this.input, h = inp.hover;
+    let c = 'default';
+    if (h) {
+      if (inp.mode === 'play') c = performance.now() - h.t > 2000 ? 'none' : 'default';
+      else if (inp.cursorRects.some((r) => h.x >= r.x && h.x <= r.x + r.w && h.y >= r.y && h.y <= r.y + r.h)) c = 'pointer';
+    }
+    if (c !== this.cursor) { this.cursor = c; this.canvas.style.cursor = c; }
+  }
+
+  toggleFullscreen() {
+    const d = document, el = d.documentElement;
+    try {
+      if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      else {
+        const r = (el.requestFullscreen || el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' });
+        // phones: try to stay sideways while in full screen (Android only; iPhone ignores it)
+        if (r && r.then) r.then(() => { if (this.device === 'phone' && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); }).catch(() => {});
+      }
+    } catch { /* not supported */ }
+    setTimeout(() => this.resize(), 300);
+  }
+  get canFullscreen() { const el = document.documentElement; return !!(el.requestFullscreen || el.webkitRequestFullscreen) && !window.IOS_BROWSER && !/iPhone|iPod/.test(navigator.userAgent); }
+  get isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
 
   setScene(s) {
     this.scene = s;
@@ -93,12 +125,15 @@ class Game {
     if (steps === 4) this.acc = 0;
     this.ctx.imageSmoothingEnabled = false;
     this.input.gestureRects = [];
+    this.input.cursorRects = [];
     try { this.scene.draw(this.ctx); } catch (e) { console.error(e); }
+    this.updateCursor();
     requestAnimationFrame((t) => this.frame(t));
   }
 }
 
 // iPhone/iPad in the Safari browser (not launched from the home screen)
+const COARSE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
 const STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
 if (IS_IOS) document.documentElement.classList.add('ios-browser'); // iOS blurs the strip under the status bar, browser and home-screen app alike

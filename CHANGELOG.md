@@ -1,5 +1,14 @@
 # Changelog
 
+## v4.3 — screens of every size
+- The view adapts to the device: phones keep the classic view, tablets and computers see more of the cave instead of giant pixels (VIEW NORMAL/WIDE/CLOSE still works on top).
+- Computers: mouse hover highlights buttons (hand cursor), clicking a level opens it, the cursor hides while playing, keyboard help on the title screen, in settings and on the first levels; touch-only settings are hidden.
+- FULL SCREEN option (computers, Android, tablets that support it; on Android phones it also tries to stay sideways).
+- BUTTONS setting: SMALL / NORMAL / BIG touch controls (joystick, arrows, DASH, FIRE).
+- Settings use two columns when the screen is short (phones held sideways), nothing is cut off any more.
+- Tip on phones held upright: turn sideways to see more of the cave.
+- Level intro panels keep a readable width on big screens.
+
 ## v4.2
 - Harpoon aim assist: every shot locks onto the best target (in the direction you point, otherwise the nearest one) and curves gently after it.
 - Kraken (75) toned down: 14 HP instead of 20, its eye stays open longer and closes for shorter, arms glow red and shake before they strike, harpoons fly through the arms, fewer ink attacks.

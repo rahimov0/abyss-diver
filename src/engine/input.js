@@ -18,6 +18,9 @@ export class Input {
     this.menuPtr = new Map(); // menu pointers: id -> {sx, sy, x, y}
     // buttons that must run inside the real touch event (e.g. opening the Google sign-in window on iPhone)
     this.gestureRects = [];
+    this.cursorRects = []; // clickable areas this frame (mouse cursor turns into a hand)
+    this.hover = null; // mouse position {x, y, t}; menus highlight what the mouse is over
+    this.btn = 1; // touch button size: 0.85 / 1 / 1.25
 
     addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
@@ -70,6 +73,10 @@ export class Input {
   }
 
   move(e) {
+    if (e.pointerType === 'mouse') {
+      const p = this.toLocal(e), h = this.hover;
+      if (!h || Math.abs(h.x - p.x) + Math.abs(h.y - p.y) > 0.5) this.hover = { x: p.x, y: p.y, t: performance.now(), moved: true };
+    }
     if (this.pads.has(e.pointerId)) this.pads.set(e.pointerId, this.padAt(this.toLocal(e)));
     const m = this.menuPtr.get(e.pointerId);
     if (m) { const p = this.toLocal(e); m.x = p.x; m.y = p.y; }
@@ -108,12 +115,14 @@ export class Input {
     if (this.dashTouch && e.pointerId === this.dashTouch.id) this.dashTouch = null;
   }
 
-  stickBase() { return { x: 36, y: this.screen.h - 40, r: 24 }; }
+  stickBase() { const r = Math.round(24 * this.btn); return { x: 12 + r, y: this.screen.h - 16 - r, r }; }
+  dashButton() { const k = this.btn, r = Math.round(17 * k); return { x: this.screen.w - 13 - r, y: this.screen.h - 15 - r, r }; }
+  fireButton() { const d = this.dashButton(), k = this.btn, r = Math.round(13 * k); return { x: d.x - Math.round(28 * k), y: d.y - Math.round(30 * k), r }; }
 
   // arrow buttons: a cross of four big separate buttons
-  padCenter() { return { x: 46, y: this.screen.h - 50 }; }
+  padCenter() { const k = this.btn, e = Math.round(37 * k); return { x: 9 + e, y: this.screen.h - 13 - e }; }
   padButtons() {
-    const c = this.padCenter(), s = 24, g = 25;
+    const c = this.padCenter(), s = Math.round(24 * this.btn), g = Math.round(25 * this.btn);
     return {
       up: { x: c.x - s / 2, y: c.y - g - s / 2, w: s, h: s, dx: 0, dy: -1 },
       down: { x: c.x - s / 2, y: c.y + g - s / 2, w: s, h: s, dx: 0, dy: 1 },
@@ -122,7 +131,7 @@ export class Input {
     };
   }
   padAt(p) { // only the button under (or nearest to) the finger — one direction per finger
-    let best = null, bd = 30;
+    let best = null, bd = 30 * this.btn;
     for (const [k, b] of Object.entries(this.padButtons())) {
       const d = Math.hypot(p.x - (b.x + b.w / 2), p.y - (b.y + b.h / 2));
       if (d < bd) { bd = d; best = k; }
@@ -148,7 +157,7 @@ export class Input {
       const dx = this.stick.x - this.stick.ox, dy = this.stick.y - this.stick.oy;
       const d = Math.hypot(dx, dy);
       if (d > 3) {
-        const m = Math.min(1, (d - 3) / 15);
+        const m = Math.min(1, (d - 3) / (15 * this.btn));
         x = (dx / d) * m; y = (dy / d) * m;
       }
     }
@@ -169,5 +178,5 @@ export class Input {
 
   pressedPads() { return new Set(this.pads.values()); }
   clearTouches() { this.stick = null; this.dashTouch = null; this.pads.clear(); }
-  endFrame() { this.pressed.clear(); this.taps.length = 0; this.swipes.length = 0; }
+  endFrame() { this.pressed.clear(); this.taps.length = 0; this.swipes.length = 0; if (this.hover) this.hover.moved = false; }
 }
