@@ -9,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V4.4';
+export const VERSION = 'V4.4.1';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -125,7 +125,7 @@ function settingsMenu(game, back) {
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
     ...accountItems(game),
-    { label: 'PRIVACY & HELP', act: () => game.openLink('support.html') },
+    { label: 'PRIVACY & HELP', act: () => game.openLink('privacy.html') },
     { label: 'BACK', act: back },
   ];
   const m = new Menu(game, build());
