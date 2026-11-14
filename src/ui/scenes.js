@@ -9,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V4.4.1';
+export const VERSION = 'V4.4.2';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -185,7 +185,7 @@ function drawSettings(ctx, game, menu, t) {
     if (it.gesture && r) game.input.gestureRects.push({ ...r, fn: () => { menu.sel = i; game.audio.play('select'); it.act(); } });
   });
   const hy = y + rows * step + 4;
-  const c = game.cloud, note = c && c.notice && Date.now() - c.notice.t < 5000 ? [c.notice.text] : null;
+  const c = game.cloud, note = c && c.notice && Date.now() - c.notice.t < (c.notice.ms || 5000) ? [c.notice.text] : null;
   const confirmDel = c && c.user && recent(c.confirmDel, 4000) ? ['YOUR CLOUD SAVE AND ACCOUNT WILL BE ERASED.', 'PROGRESS ON THIS DEVICE STAYS.'] : null;
   const help = note || confirmDel || (onComputer(game) ? KEY_HELP : CONTROL_HELP[s.controls]);
   help.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, help === confirmDel ? '#ff8080' : help === note ? '#7affe0' : '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));

@@ -6,6 +6,13 @@ import { saveHooks, writeSave, mergeProgress, progressOf } from './game/save.js'
 
 const SDK = 'https://www.gstatic.com/firebasejs/11.0.2';
 export const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+// native plugin proxy (capacitor.js from @capacitor/core provides registerPlugin in the app build)
+export function plugin(name) {
+  const C = window.Capacitor;
+  if (C && typeof C.registerPlugin === 'function') return C.registerPlugin(name);
+  if (C && C.Plugins && C.Plugins[name]) return C.Plugins[name];
+  throw new Error(`plugin ${name} missing`);
+}
 const COLLECTION = 'abyssDiver';
 
 export class Cloud {
@@ -20,10 +27,21 @@ export class Cloud {
     this.notice = null; // short message shown in settings, e.g. after deleting the account
     if (!this.enabled) return;
     saveHooks.push(() => this.schedulePush());
-    this.ready = (NATIVE ? this.initNative() : this.initWeb()).catch((e) => { console.warn('cloud init failed', e); this.status = 'error'; });
+    this.ready = (NATIVE ? this.initNative() : this.initWeb()).catch((e) => {
+      console.warn('cloud init failed', e); this.status = 'error'; this.initError = Cloud.why(e);
+      if (NATIVE) this.say(`CLOUD ERROR: ${this.initError}`, 15000);
+    });
   }
 
-  say(text) { this.notice = { text, t: Date.now() }; }
+  say(text, ms = 5000) { this.notice = { text, t: Date.now(), ms }; }
+
+  // short readable reason for the settings screen (the pixel font only has A-Z, 0-9 and a few signs)
+  static why(e) {
+    let raw = String((e && (e.code || e.message || e.errorMessage)) || e || 'UNKNOWN');
+    const num = raw.match(/error\s*(-?\d+)/i);
+    if (num && raw.length > 30) raw = `ERROR ${num[1]} ${raw}`; // keep the error number visible
+    return raw.toUpperCase().replace(/^AUTH\//, '').replace(/[^A-Z0-9 .:\-/]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+  }
 
   // ---------- setup ----------
   async initWeb() {
@@ -43,9 +61,8 @@ export class Cloud {
   }
 
   async initNative() {
-    const C = window.Capacitor;
-    this.FA = C.registerPlugin('FirebaseAuthentication');
-    this.FS = C.registerPlugin('FirebaseFirestore');
+    this.FA = plugin('FirebaseAuthentication');
+    this.FS = plugin('FirebaseFirestore');
     await this.FA.addListener('authStateChange', (e) => this.onUser(e && e.user));
     const { user } = await this.FA.getCurrentUser();
     this.onUser(user);
@@ -71,18 +88,20 @@ export class Cloud {
   // ---------- sign in / out ----------
   // Web: must be called straight from a tap/click handler (no await before it), or Safari blocks the window.
   signIn(which = 'google') {
-    if (!this.enabled || (!this.auth && !this.FA)) return;
+    if (!this.enabled) return;
+    if (!this.auth && !this.FA) { this.say(`CLOUD ERROR: ${this.initError || 'NOT READY'}`, 12000); return; }
     this.status = 'signing'; this.signStart = Date.now(); this.signWith = which;
     const done = () => { if (this.status === 'signing') this.status = this.user ? 'syncing' : 'signedout'; };
     const fail = (e) => {
       const code = (e && (e.code || e.message)) || '';
       console.warn('sign-in failed', code, e);
-      // closing the sign-in sheet is not an error worth shouting about
-      if (!/cancel|popup-closed|1001/i.test(String(code))) { this.lastErrorCode = code; this.lastError = Date.now(); }
+      // closing the sign-in sheet is not an error worth shouting about, but say what happened either way
+      if (/cancel|popup-closed|1001/i.test(String(code))) this.say('SIGN-IN CANCELLED');
+      else { this.lastErrorCode = code; this.lastError = Date.now(); this.say(`FAILED: ${Cloud.why(e)}`, 12000); }
       this.status = this.user ? 'synced' : 'signedout';
     };
     if (this.native) {
-      (which === 'apple' ? this.FA.signInWithApple() : this.FA.signInWithGoogle()).then(done, fail);
+      try { (which === 'apple' ? this.FA.signInWithApple() : this.FA.signInWithGoogle()).then(done, fail); } catch (e) { fail(e); }
       return;
     }
     this.fb.signInWithPopup(this.auth, this.provider).then(done).catch((e) => {
@@ -130,7 +149,7 @@ export class Cloud {
     }).catch((e) => {
       console.warn('delete failed', e);
       this.status = this.user ? 'synced' : 'signedout';
-      this.say('NOT DELETED - TRY AGAIN');
+      this.say(`NOT DELETED: ${Cloud.why(e)}`, 12000);
     });
   }
 

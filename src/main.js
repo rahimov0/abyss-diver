@@ -3,7 +3,7 @@ import { Audio } from './engine/audio.js';
 import { loadSave } from './game/save.js';
 import { TitleScene, PlayScene } from './ui/scenes.js';
 import { LEVELS } from './level/levels.js';
-import { Cloud, NATIVE } from './cloud.js';
+import { Cloud, NATIVE, plugin } from './cloud.js';
 
 class Game {
   constructor(canvas) {
@@ -97,7 +97,7 @@ class Game {
     if (this.save.vibrate === false) return;
     try {
       if (NATIVE) {
-        if (!this.haptics) this.haptics = window.Capacitor.registerPlugin('Haptics');
+        if (!this.haptics) this.haptics = plugin('Haptics');
         this.haptics.impact({ style: ms >= 120 ? 'HEAVY' : ms >= 50 ? 'MEDIUM' : 'LIGHT' }).catch(() => {});
       } else if (navigator.vibrate) navigator.vibrate(ms);
     } catch { /* unsupported */ }
@@ -106,6 +106,13 @@ class Game {
   // privacy / support pages: the website in a browser, Safari from the app
   openLink(page) {
     const url = NATIVE || location.protocol !== 'https:' ? `https://abyss-diver.rahimov.tr/${page}` : new URL(page, location.href).href;
+    if (NATIVE) { // in-app Safari sheet; window.open is blocked outside a tap event in the app's web view
+      try {
+        if (!this.browser) this.browser = plugin('Browser');
+        this.browser.open({ url, presentationStyle: 'popover' }).catch(() => { location.href = url; });
+      } catch { location.href = url; }
+      return;
+    }
     try { window.open(url, '_blank', 'noopener'); } catch { location.href = url; }
   }
   get isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
