@@ -24,11 +24,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-/// Full-screen game view: no status bar, the home bar fades out and
-/// edge swipes need a second swipe so they don't interrupt a dive.
+/// Full-screen game view. The status bar and home bar are hidden by Capacitor's
+/// SystemBars plugin (capacitor.config.json); here edge swipes need a second swipe
+/// so they don't interrupt a dive.
 class GameViewController: CAPBridgeViewController {
-    override var prefersStatusBarHidden: Bool { true }
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
 
     override func viewDidLoad() {

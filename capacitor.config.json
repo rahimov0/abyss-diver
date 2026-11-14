@@ -16,6 +16,11 @@
         "google.com",
         "apple.com"
       ]
+    },
+    "SystemBars": {
+      "hidden": true,
+      "style": "DARK",
+      "animation": "NONE"
     }
   },
   "experimental": {
