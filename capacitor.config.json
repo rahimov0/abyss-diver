@@ -1,0 +1,41 @@
+{
+  "appId": "tr.rahimov.abyssdiver",
+  "appName": "Abyss Diver",
+  "webDir": "www",
+  "backgroundColor": "#05070f",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#05070f",
+    "preferredContentMode": "mobile"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": [
+        "google.com",
+        "apple.com"
+      ]
+    }
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.1",
+        "packageTraits": {
+          "@capacitor-firebase/authentication": [
+            "Google"
+          ]
+        },
+        "packageOptions": {
+          "@capacitor-firebase/authentication": {
+            "symlink": true
+          },
+          "@capacitor-firebase/firestore": {
+            "symlink": true
+          }
+        }
+      }
+    }
+  }
+}

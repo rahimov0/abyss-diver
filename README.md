@@ -32,3 +32,11 @@ npm run validate   # generates all 75 levels and proves each one is solvable
 - 3 stars per level (finish · all treasure · no damage), saved progress, chiptune music
 - Every level is validated by a flood‑fill solver (`tools/validate-levels.mjs`): all gems, keys, chests and the exit are reachable
 - PWA: installable, works offline
+
+## iOS app
+
+The same game is packaged as an iOS/iPadOS app with [Capacitor](https://capacitorjs.com) (`ios/`, `capacitor.config.json`).
+`npm run ios:sync` copies the game into the Xcode project; the **iOS build → TestFlight** GitHub Actions workflow builds and uploads it (no Mac needed).
+Setup steps (Apple / Firebase / GitHub secrets) are in [`appstore/KURULUM.md`](appstore/KURULUM.md), store texts in [`appstore/LISTING.md`](appstore/LISTING.md).
+
+Privacy: [privacy.html](https://abyss-diver.rahimov.tr/privacy.html) · Terms: [terms.html](https://abyss-diver.rahimov.tr/terms.html) · Support: [support.html](https://abyss-diver.rahimov.tr/support.html)

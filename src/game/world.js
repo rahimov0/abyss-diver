@@ -100,8 +100,7 @@ export class World {
 
   // ---------- checkpoints & vibration ----------
   buzz(ms) {
-    if (this.game.save.vibrate === false) return;
-    try { if (navigator.vibrate) navigator.vibrate(ms); } catch { /* unsupported */ }
+    this.game.vibrate(ms);
   }
 
   // Checkpoint flags are placed at run time on the existing main route (the level itself is untouched).

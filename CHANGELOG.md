@@ -1,5 +1,14 @@
 # Changelog
 
+## v4.4 — iOS app (App Store)
+- iOS/iPadOS app built with Capacitor (`ios/`): the whole game ships inside the app and works offline; no status bar, home bar auto-hides, real haptics.
+- Optional cloud save in the app uses native Firebase sign-in: **Sign in with Apple** and Google.
+- **DELETE ACCOUNT** in Settings (app and web): deletes the cloud save and the account (Apple tokens are revoked); progress on the device stays.
+- Privacy policy, terms of use and support pages (TR + EN): privacy.html, terms.html, support.html; PRIVACY & HELP in Settings.
+- GitHub Actions workflow builds the app on macOS 26 / Xcode 26 and uploads it to TestFlight (`.github/workflows/ios.yml`).
+- App Store listing texts and screenshots in `appstore/`, step-by-step guide in `appstore/KURULUM.md`.
+- Levels unchanged (all 75 fingerprint-locked).
+
 ## v4.3 — screens of every size
 - The view adapts to the device: phones keep the classic view, tablets and computers see more of the cave instead of giant pixels (VIEW NORMAL/WIDE/CLOSE still works on top).
 - Computers: mouse hover highlights buttons (hand cursor), clicking a level opens it, the cursor hides while playing, keyboard help on the title screen, in settings and on the first levels; touch-only settings are hidden.

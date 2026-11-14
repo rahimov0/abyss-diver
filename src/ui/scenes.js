@@ -9,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V4.3';
+export const VERSION = 'V4.4';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -89,7 +89,7 @@ class Menu {
       const x = Math.round(cx - (cols * w + (cols - 1) * cg) / 2 + col * (w + cg)), yy = y + row * (h + gap);
       const on = i === this.sel;
       panel(ctx, x, yy, w, h, on ? '#1a3a6a' : '#0b1430', on ? '#ffd23f' : '#3aaee0');
-      drawText(ctx, typeof it.label === 'function' ? it.label() : it.label, x + Math.round(w / 2), yy + Math.floor((h - 5) / 2), on ? '#ffd23f' : '#d8f4ff', { align: 'center' });
+      drawText(ctx, typeof it.label === 'function' ? it.label() : it.label, x + Math.round(w / 2), yy + Math.floor((h - 5) / 2), on ? '#ffd23f' : it.danger ? '#ff8080' : '#d8f4ff', { align: 'center' });
       if (on && (t >> 4) % 2) drawText(ctx, '>', x + 5, yy + Math.floor((h - 5) / 2), '#ffd23f');
       this.rects.push({ x, y: yy, w, h });
       this.game.input.cursorRects.push({ x, y: yy, w, h });
@@ -115,38 +115,52 @@ function settingsMenu(game, back) {
   const s = game.save;
   const save = () => writeSave(s);
   const pc = onComputer(game); // touch-only options are hidden on computers
-  return new Menu(game, [
+  const build = () => [
     ...(pc ? [] : [{ label: () => `CONTROLS  ${CONTROL_NAMES[s.controls]}`, act: () => { s.controls = cycle(['stick', 'dpad', 'swipe'], s.controls); game.input.ctrl = s.controls; save(); } }]),
     { label: () => `VIEW  ${VIEW_NAMES[s.view]}`, act: () => { s.view = cycle(['normal', 'wide', 'close'], s.view); save(); game.resize(); } },
     ...(pc ? [] : [{ label: () => `BUTTONS  ${BTN_NAMES[s.buttons] || 'NORMAL'}`, act: () => { s.buttons = cycle(['small', 'normal', 'big'], s.buttons || 'normal'); game.input.btn = { small: 0.85, normal: 1, big: 1.25 }[s.buttons]; save(); } }]),
     ...(game.canFullscreen ? [{ label: () => `FULL SCREEN  ${game.isFullscreen ? 'ON' : 'OFF'}`, act: () => game.toggleFullscreen(), gesture: true }] : []),
     { label: () => `MINI MAP  ${s.minimap ? 'ON' : 'OFF'}`, act: () => { s.minimap = !s.minimap; save(); } },
-    { label: () => `VIBRATION  ${s.vibrate !== false ? 'ON' : 'OFF'}`, act: () => { s.vibrate = s.vibrate === false; save(); if (s.vibrate) try { navigator.vibrate && navigator.vibrate(40); } catch { /* */ } } },
+    { label: () => `VIBRATION  ${s.vibrate !== false ? 'ON' : 'OFF'}`, act: () => { s.vibrate = s.vibrate === false; save(); if (s.vibrate) game.vibrate(40); } },
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
-    { label: () => accountLabel(game), act: () => accountAction(game), gesture: true },
+    ...accountItems(game),
+    { label: 'PRIVACY & HELP', act: () => game.openLink('support.html') },
     { label: 'BACK', act: back },
-  ]);
+  ];
+  const m = new Menu(game, build());
+  // the account buttons change with the sign-in state, so the list is rebuilt every frame
+  m.refresh = () => { m.items = build(); if (m.sel >= m.items.length) m.sel = m.items.length - 1; };
+  return m;
 }
 
-// ---------- cloud account (Google sign-in) ----------
-function accountLabel(game) {
+// ---------- cloud account (optional: Google, or Apple in the iOS app) ----------
+const recent = (t, ms = 3000) => t && Date.now() - t < ms;
+function accountItems(game) {
   const c = game.cloud;
-  if (!c || !c.enabled) return 'CLOUD SAVE  SOON';
-  if (c.status === 'loading') return 'CONNECTING...';
-  if (c.status === 'signing') return Date.now() - c.signStart > 12000 ? 'TAP TO TRY AGAIN' : 'OPENING GOOGLE...';
-  if (c.lastError && Date.now() - c.lastError < 6000 && !c.user) return 'FAILED - TAP TO RETRY';
-  if (!c.user) return 'SIGN IN WITH GOOGLE';
-  if (c.confirmOut && Date.now() - c.confirmOut < 3000) return 'TAP AGAIN: SIGN OUT';
-  return `${c.status === 'error' ? 'SYNC ERROR' : 'SYNCED'}  ${c.name}`;
-}
-function accountAction(game) {
-  const c = game.cloud;
-  if (!c || !c.enabled || c.status === 'loading') return;
-  if (c.status === 'signing' && Date.now() - c.signStart < 12000) return;
-  if (!c.user) { c.signIn(); return; }
-  if (c.confirmOut && Date.now() - c.confirmOut < 3000) { c.confirmOut = 0; c.signOut(); return; }
-  c.confirmOut = Date.now();
+  if (!c || !c.enabled) return [];
+  if (c.status === 'loading') return [{ label: 'CLOUD SAVE...', act: () => {} }];
+  if (c.status === 'deleting') return [{ label: 'DELETING ACCOUNT...', act: () => {} }];
+  if (c.status === 'signing' && !recent(c.signStart, 15000) && !c.user) c.status = 'signedout';
+  if (!c.user) {
+    if (c.status === 'signing') return [{ label: `OPENING ${c.signWith === 'apple' ? 'APPLE' : 'GOOGLE'}...`, act: () => {} }];
+    const failed = recent(c.lastError, 6000);
+    return c.providers.map((p) => ({
+      label: () => (failed && c.signWith === p ? 'FAILED - TAP TO RETRY' : `SIGN IN WITH ${p === 'apple' ? 'APPLE' : 'GOOGLE'}`),
+      act: () => c.signIn(p), gesture: true,
+    }));
+  }
+  return [
+    {
+      label: () => (recent(c.confirmOut) ? 'TAP AGAIN: SIGN OUT' : `${c.status === 'error' ? 'SYNC ERROR' : 'SYNCED'}  ${c.name}`),
+      act: () => { if (recent(c.confirmOut)) { c.confirmOut = 0; c.signOut(); } else c.confirmOut = Date.now(); },
+    },
+    {
+      label: () => (recent(c.confirmDel, 4000) ? 'TAP AGAIN: DELETE FOREVER' : 'DELETE ACCOUNT'),
+      act: () => { if (recent(c.confirmDel, 4000)) { c.confirmDel = 0; c.deleteAccount(); } else c.confirmDel = Date.now(); },
+      gesture: true, danger: true,
+    },
+  ];
 }
 export function cloudBadge(game) {
   const c = game.cloud;
@@ -155,6 +169,7 @@ export function cloudBadge(game) {
 }
 
 function drawSettings(ctx, game, menu, t) {
+  if (menu.refresh) menu.refresh();
   const v = game.view, s = game.save, n = menu.items.length;
   // one column when it fits, otherwise two side by side (phones held sideways)
   const cols = n * 19 + 70 > v.h && v.w >= 290 ? 2 : 1;
@@ -170,8 +185,10 @@ function drawSettings(ctx, game, menu, t) {
     if (it.gesture && r) game.input.gestureRects.push({ ...r, fn: () => { menu.sel = i; game.audio.play('select'); it.act(); } });
   });
   const hy = y + rows * step + 4;
-  const help = onComputer(game) ? KEY_HELP : CONTROL_HELP[s.controls];
-  help.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
+  const c = game.cloud, note = c && c.notice && Date.now() - c.notice.t < 5000 ? [c.notice.text] : null;
+  const confirmDel = c && c.user && recent(c.confirmDel, 4000) ? ['YOUR CLOUD SAVE AND ACCOUNT WILL BE ERASED.', 'PROGRESS ON THIS DEVICE STAYS.'] : null;
+  const help = note || confirmDel || (onComputer(game) ? KEY_HELP : CONTROL_HELP[s.controls]);
+  help.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, help === confirmDel ? '#ff8080' : help === note ? '#7affe0' : '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
   if (hy + 26 < v.h) drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 18, '#5d6478', { align: 'center', outline: '#0b0e1c' });
 }
 

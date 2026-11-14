@@ -1,15 +1,27 @@
 {
   "name": "abyss-diver",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "validate": "node tools/validate-levels.mjs"
+    "validate": "node tools/validate-levels.mjs",
+    "build:www": "node tools/build-www.mjs",
+    "ios:sync": "node tools/build-www.mjs && npx cap sync ios"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
     "vite": "^8.0.0"
-  }
+  },
+  "dependencies": {
+    "@capacitor-firebase/authentication": "^8.6.0",
+    "@capacitor-firebase/firestore": "^8.6.0",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.6.2",
+    "firebase": "^12.19.0"
+  },
+  "iosVersion": "1.0.0"
 }

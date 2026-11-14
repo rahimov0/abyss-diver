@@ -3,7 +3,7 @@ import { Audio } from './engine/audio.js';
 import { loadSave } from './game/save.js';
 import { TitleScene, PlayScene } from './ui/scenes.js';
 import { LEVELS } from './level/levels.js';
-import { Cloud } from './cloud.js';
+import { Cloud, NATIVE } from './cloud.js';
 
 class Game {
   constructor(canvas) {
@@ -90,7 +90,24 @@ class Game {
     } catch { /* not supported */ }
     setTimeout(() => this.resize(), 300);
   }
-  get canFullscreen() { const el = document.documentElement; return !!(el.requestFullscreen || el.webkitRequestFullscreen) && !window.IOS_BROWSER && !/iPhone|iPod/.test(navigator.userAgent); }
+  get canFullscreen() { const el = document.documentElement; return !NATIVE && !!(el.requestFullscreen || el.webkitRequestFullscreen) && !window.IOS_BROWSER && !/iPhone|iPod/.test(navigator.userAgent); }
+
+  // short buzz: real haptics in the iOS app, navigator.vibrate on Android browsers
+  vibrate(ms) {
+    if (this.save.vibrate === false) return;
+    try {
+      if (NATIVE) {
+        if (!this.haptics) this.haptics = window.Capacitor.registerPlugin('Haptics');
+        this.haptics.impact({ style: ms >= 120 ? 'HEAVY' : ms >= 50 ? 'MEDIUM' : 'LIGHT' }).catch(() => {});
+      } else if (navigator.vibrate) navigator.vibrate(ms);
+    } catch { /* unsupported */ }
+  }
+
+  // privacy / support pages: the website in a browser, Safari from the app
+  openLink(page) {
+    const url = NATIVE || location.protocol !== 'https:' ? `https://abyss-diver.rahimov.tr/${page}` : new URL(page, location.href).href;
+    try { window.open(url, '_blank', 'noopener'); } catch { location.href = url; }
+  }
   get isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
 
   setScene(s) {
@@ -136,8 +153,11 @@ class Game {
 const COARSE = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
 const STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
-if (IS_IOS) document.documentElement.classList.add('ios-browser'); // iOS blurs the strip under the status bar, browser and home-screen app alike
-window.IOS_BROWSER = IS_IOS && !STANDALONE;
+// the iOS App Store app has no status bar and no browser chrome, so none of the Safari workarounds apply
+if (IS_IOS && !NATIVE) document.documentElement.classList.add('ios-browser'); // iOS blurs the strip under the status bar, browser and home-screen app alike
+if (NATIVE) document.documentElement.classList.add('native-app');
+window.IOS_BROWSER = IS_IOS && !STANDALONE && !NATIVE;
+window.NATIVE_APP = NATIVE;
 
 // iOS ignores user-scalable=no: block pinch / double-tap zoom ourselves
 function blockZoom(canvas) {
@@ -152,7 +172,7 @@ function blockZoom(canvas) {
 window.game = new Game(document.getElementById('game'));
 
 // Service worker (network-first) + clean up the old Magma Runner worker
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => {
     const u = r.active && r.active.scriptURL;
     if (u && new URL(u).pathname !== new URL('./sw.js', location.href).pathname) r.unregister();
