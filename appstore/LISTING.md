@@ -111,5 +111,7 @@ Nothing else (no location, no diagnostics, no analytics, no ads).
 ## Screenshots
 
 - iPhone 6.9" (2868 × 1320, landscape): `appstore/screenshots/iphone-6.9/1.png … 6.png`
+- iPhone 6.3" (2622 × 1206, landscape): `appstore/screenshots/iphone-6.3/1.png … 6.png`
+- iPhone 6.1" (2556 × 1179, landscape): `appstore/screenshots/iphone-6.1/1.png … 6.png`
 - iPad 13" (2752 × 2064, landscape): `appstore/screenshots/ipad-13/1.png … 6.png`
 - App icon (1024 × 1024): `appstore/icon-1024.png` (already inside the app; App Store Connect takes it from the build)
