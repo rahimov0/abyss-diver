@@ -52,7 +52,7 @@ Start playing immediately — no account needed. If you want to keep your progre
 
 ## Türkçe
 
-**Alt başlık [30]:** Retro piksel derin deniz macerası
+**Alt başlık [30]:** Retro piksel dalış macerası
 
 **Tanıtım metni [170]:**
 Mercan resiflerinden batık tapınaklara, zehirli hendeklerden denizaltı üssüne 75 özel tasarım dalış. Ücretsiz, reklamsız, kayıt gerektirmez — hemen dal.
