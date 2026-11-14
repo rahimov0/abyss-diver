@@ -6,8 +6,8 @@ Everything to paste into App Store Connect. Field limits are in brackets.
 
 | Field | Value |
 |---|---|
-| Name [30] | Abyss Diver |
-| Name if taken | Abyss Diver: Pixel Dive |
+| Name [30] | Abyss Diver: Pixel Dive ("Abyss Diver" was taken) |
+| Name under the icon | Abyss Diver |
 | Bundle ID | tr.rahimov.abyssdiver |
 | SKU | abyssdiver001 |
 | Primary category | Games → Action |
