@@ -25,6 +25,10 @@ class Game {
     addEventListener('resize', rs);
     addEventListener('orientationchange', rs);
     if (window.visualViewport) visualViewport.addEventListener('resize', rs);
+    // the iOS app's web view settles its safe-area insets after launch without a resize event,
+    // so watch the game box itself (and re-check now and then) instead of trusting window events
+    if (window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(this.wrap);
+    [100, 400, 1000, 2500].forEach((ms) => setTimeout(() => this.resize(), ms));
     document.addEventListener('fullscreenchange', rs);
     this.input.btn = { small: 0.85, normal: 1, big: 1.25 }[this.save.buttons] || 1;
     blockZoom(canvas);
@@ -47,6 +51,7 @@ class Game {
     const r = this.wrap.getBoundingClientRect();
     const vw = r.width, vh = r.height;
     if (vw < 10 || vh < 10) return; // hidden / not laid out yet; the next resize event fixes it
+    this.wrapSize = `${vw}x${vh}x${dpr}x${this.save.view}`;
     const pw = vw * dpr, ph = vh * dpr;
     // how many game pixels fit on the short side: phones keep the classic view,
     // tablets and computers see more of the cave instead of getting giant pixels
@@ -137,6 +142,11 @@ class Game {
   play(id) { this.setScene(new PlayScene(this, id)); }
 
   frame(now) {
+    // safety net: if the game box changed size without any event, fit the canvas again
+    if ((this.frameN = (this.frameN || 0) + 1) % 30 === 0) {
+      const r = this.wrap.getBoundingClientRect();
+      if (`${r.width}x${r.height}x${window.devicePixelRatio || 1}x${this.save.view}` !== this.wrapSize) this.resize();
+    }
     const dt = Math.min(100, now - this.last);
     this.last = now;
     this.acc += dt;

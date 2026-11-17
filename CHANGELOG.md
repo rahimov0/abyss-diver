@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.4.4
+- iOS app: the game sometimes started too big for the screen (joystick/DASH cut off) until the phone was rotated. The canvas now refits whenever the game area changes size, including when iOS applies the notch/home-bar insets after launch.
+
 ## v4.4.3
 - Progress now belongs to the account: signing out resets this device to a fresh start (the progress stays in the account), and signing in with a different account loads that account's own progress instead of inheriting the previous one. Guest progress is still added to the first account you sign in with.
 
