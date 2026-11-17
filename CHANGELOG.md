@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.4.3
+- Progress now belongs to the account: signing out resets this device to a fresh start (the progress stays in the account), and signing in with a different account loads that account's own progress instead of inheriting the previous one. Guest progress is still added to the first account you sign in with.
+
 ## v4.4 — iOS app (App Store)
 - iOS/iPadOS app built with Capacitor (`ios/`): the whole game ships inside the app and works offline; no status bar, home bar auto-hides, real haptics.
 - Optional cloud save in the app uses native Firebase sign-in: **Sign in with Apple** and Google.

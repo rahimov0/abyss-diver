@@ -30,6 +30,11 @@ export function mergeProgress(local, remote) {
   return changed;
 }
 
+// Back to a fresh start (used when the signed-in account signs out, or another account signs in).
+export function resetProgress(s) {
+  s.unlocked = 1; s.best = {}; s.diver = 'bubble';
+}
+
 // Only progress goes to the cloud; sound / controls / view stay per device.
 export function progressOf(s) {
   return { unlocked: s.unlocked, best: s.best, diver: s.diver };

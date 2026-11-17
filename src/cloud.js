@@ -2,7 +2,7 @@
 // The game never needs it — progress always lives on the device; signing in only backs it up / syncs it.
 // Web: Firebase JS SDK loaded lazily from the CDN. iOS app: native Firebase plugins (no web sign-in windows).
 import { FIREBASE_CONFIG } from './firebase-config.js';
-import { saveHooks, writeSave, mergeProgress, progressOf } from './game/save.js';
+import { saveHooks, writeSave, mergeProgress, progressOf, resetProgress } from './game/save.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/11.0.2';
 export const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -118,7 +118,11 @@ export class Cloud {
     await this.push(); // make sure the latest progress is up there first
     if (this.native) await this.FA.signOut(); else await this.fb.signOut(this.auth);
     this.user = null; this.status = 'signedout';
-    this.say('SIGNED OUT');
+    // the progress belongs to that account (it's safe in the cloud): this device starts fresh,
+    // so the next account to sign in here doesn't inherit it
+    const s = this.game.save;
+    resetProgress(s); s.owner = null; writeSave(s, { silent: true });
+    this.say('SIGNED OUT - PROGRESS KEPT IN YOUR ACCOUNT', 8000);
   }
 
   // Deletes the cloud save and the account itself. Progress on this device stays.
@@ -145,6 +149,7 @@ export class Cloud {
     };
     return run().then(() => {
       this.user = null; this.lastPushed = null; this.status = 'signedout';
+      const s = this.game.save; s.owner = null; writeSave(s, { silent: true }); // device progress stays, as a guest
       this.say('ACCOUNT DELETED');
     }).catch((e) => {
       console.warn('delete failed', e);
@@ -173,9 +178,15 @@ export class Cloud {
     if (!this.user) return;
     this.status = 'syncing';
     try {
-      const remote = await this.readRemote(this.user.uid);
+      const uid = this.user.uid, remote = await this.readRemote(uid);
       const s = this.game.save;
-      if (mergeProgress(s, remote)) writeSave(s, { silent: true });
+      if (s.owner && s.owner !== uid) {
+        // what's on this device belongs to a different account: switch to this account's own progress
+        resetProgress(s);
+        mergeProgress(s, remote);
+      } else mergeProgress(s, remote); // guest progress (or this account's offline play) is added to the account
+      s.owner = uid;
+      writeSave(s, { silent: true });
       this.lastPushed = remote ? JSON.stringify(progressOf({ unlocked: 1, best: {}, diver: 'bubble', ...remote })) : null;
       await this.push(); // only writes if this device had progress the cloud didn't
       this.status = 'synced';
