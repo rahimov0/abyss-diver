@@ -125,7 +125,7 @@ export class Cloud {
     this.say('SIGNED OUT - PROGRESS KEPT IN YOUR ACCOUNT', 8000);
   }
 
-  // Deletes the cloud save and the account itself. Progress on this device stays.
+  // Deletes the cloud save and the account itself, and wipes that account's progress from this device too.
   // Web: call straight from a tap (the provider asks you to confirm in a window).
   deleteAccount() {
     if (!this.user) return Promise.resolve();
@@ -149,7 +149,7 @@ export class Cloud {
     };
     return run().then(() => {
       this.user = null; this.lastPushed = null; this.status = 'signedout';
-      const s = this.game.save; s.owner = null; writeSave(s, { silent: true }); // device progress stays, as a guest
+      const s = this.game.save; resetProgress(s); s.owner = null; writeSave(s, { silent: true }); // deleted means gone: start from level 1
       this.say('ACCOUNT DELETED');
     }).catch((e) => {
       console.warn('delete failed', e);
@@ -175,7 +175,7 @@ export class Cloud {
   }
 
   async pull() {
-    if (!this.user) return;
+    if (!this.user || this.status === 'deleting') return;
     this.status = 'syncing';
     try {
       const uid = this.user.uid, remote = await this.readRemote(uid);

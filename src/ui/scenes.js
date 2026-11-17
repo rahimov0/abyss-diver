@@ -9,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V4.4.4';
+export const VERSION = 'V4.4.5';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -186,7 +186,7 @@ function drawSettings(ctx, game, menu, t) {
   });
   const hy = y + rows * step + 4;
   const c = game.cloud, note = c && c.notice && Date.now() - c.notice.t < (c.notice.ms || 5000) ? [c.notice.text] : null;
-  const confirmDel = c && c.user && recent(c.confirmDel, 4000) ? ['YOUR CLOUD SAVE AND ACCOUNT WILL BE ERASED.', 'PROGRESS ON THIS DEVICE STAYS.'] : null;
+  const confirmDel = c && c.user && recent(c.confirmDel, 4000) ? ['YOUR CLOUD SAVE AND ACCOUNT WILL BE ERASED.', 'ALL PROGRESS RESETS TO LEVEL 1.'] : null;
   const help = note || confirmDel || (onComputer(game) ? KEY_HELP : CONTROL_HELP[s.controls]);
   help.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, help === confirmDel ? '#ff8080' : help === note ? '#7affe0' : '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
   if (hy + 26 < v.h) drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 18, '#5d6478', { align: 'center', outline: '#0b0e1c' });
