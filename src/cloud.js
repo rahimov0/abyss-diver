@@ -116,6 +116,7 @@ export class Cloud {
   async signOut() {
     if (!this.user) return;
     await this.push(); // make sure the latest progress is up there first
+    if (this.status === 'error') { this.say('NO CONNECTION - PROGRESS NOT SAVED YET. TRY AGAIN ONLINE', 10000); return; }
     if (this.native) await this.FA.signOut(); else await this.fb.signOut(this.auth);
     this.user = null; this.status = 'signedout';
     // the progress belongs to that account (it's safe in the cloud): this device starts fresh,
@@ -203,6 +204,8 @@ export class Cloud {
   async push() {
     if (!this.user || this.status === 'deleting') return;
     clearTimeout(this.timer);
+    // never write progress that belongs to another account (e.g. the first sync failed offline): sync first
+    if (this.game.save.owner !== this.user.uid) return this.pull();
     const data = progressOf(this.game.save), json = JSON.stringify(data);
     if (json === this.lastPushed) { this.status = 'synced'; return; }
     try {

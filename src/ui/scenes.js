@@ -185,11 +185,22 @@ function drawSettings(ctx, game, menu, t) {
     if (it.gesture && r) game.input.gestureRects.push({ ...r, fn: () => { menu.sel = i; game.audio.play('select'); it.act(); } });
   });
   const hy = y + rows * step + 4;
-  const c = game.cloud, note = c && c.notice && Date.now() - c.notice.t < (c.notice.ms || 5000) ? [c.notice.text] : null;
+  const c = game.cloud, note = c && c.notice && Date.now() - c.notice.t < (c.notice.ms || 5000) ? wrapWords(c.notice.text, 32) : null;
   const confirmDel = c && c.user && recent(c.confirmDel, 4000) ? ['YOUR CLOUD SAVE AND ACCOUNT WILL BE ERASED.', 'ALL PROGRESS RESETS TO LEVEL 1.'] : null;
   const help = note || confirmDel || (onComputer(game) ? KEY_HELP : CONTROL_HELP[s.controls]);
   help.forEach((l, i) => drawText(ctx, l, v.w / 2, hy + i * 8, help === confirmDel ? '#ff8080' : help === note ? '#7affe0' : '#9aa4b8', { align: 'center', outline: '#0b0e1c' }));
-  if (hy + 26 < v.h) drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hy + 18, '#5d6478', { align: 'center', outline: '#0b0e1c' });
+  const hintY = hy + Math.max(2, help.length) * 8 + 2;
+  if (hintY + 8 < v.h) drawText(ctx, 'VIEW WIDE = SEE MORE OF THE CAVE', v.w / 2, hintY, '#5d6478', { align: 'center', outline: '#0b0e1c' });
+}
+
+// split a message into lines of at most n characters (long notices must fit narrow portrait screens)
+function wrapWords(text, n) {
+  const out = [''];
+  for (const w of text.split(' ')) {
+    const cur = out[out.length - 1];
+    if (cur && (cur + ' ' + w).length > n) out.push(w); else out[out.length - 1] = cur ? cur + ' ' + w : w;
+  }
+  return out;
 }
 
 // animated underwater backdrop for menus

@@ -2,6 +2,9 @@
 
 ## v4.4.5
 - Deleting your account now also clears its progress from the device (back to level 1, default diver). Before, the levels stayed on screen as guest progress and would be merged into the next account.
+- Signing out with no connection no longer drops progress that hasn't reached the cloud yet: it says so and keeps you signed in.
+- If the first sync after signing in fails (offline), the game no longer uploads the previous account's progress into the new account; it syncs properly once back online.
+- Long settings messages wrap onto several lines on narrow screens.
 
 ## v4.4.4
 - iOS app: the game sometimes started too big for the screen (joystick/DASH cut off) until the phone was rotated. The canvas now refits whenever the game area changes size, including when iOS applies the notch/home-bar insets after launch.
