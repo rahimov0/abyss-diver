@@ -4,6 +4,7 @@ import { loadSave } from './game/save.js';
 import { TitleScene, PlayScene } from './ui/scenes.js';
 import { LEVELS } from './level/levels.js';
 import { Cloud, NATIVE, plugin } from './cloud.js';
+import { Ads } from './ads.js';
 
 class Game {
   constructor(canvas) {
@@ -12,6 +13,7 @@ class Game {
     this.view = { w: 216, h: 320 };
     this.save = loadSave();
     this.cloud = new Cloud(this);
+    this.ads = new Ads(this);
     this.audio = new Audio();
     this.audio.sfxOn = this.save.sound;
     this.audio.musicOn = this.save.music;
@@ -147,6 +149,7 @@ class Game {
       const r = this.wrap.getBoundingClientRect();
       if (`${r.width}x${r.height}x${window.devicePixelRatio || 1}x${this.save.view}` !== this.wrapSize) this.resize();
     }
+    this.ads.wantBanner(this.scene instanceof TitleScene); // banner only on the main menu
     const dt = Math.min(100, now - this.last);
     this.last = now;
     this.acc += dt;

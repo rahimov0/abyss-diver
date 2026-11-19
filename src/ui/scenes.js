@@ -9,7 +9,7 @@ import { disc, px, mix, hash, tri } from '../gfx/pixel.js';
 import { writeSave } from '../game/save.js';
 import { DIVERS, totalStars, currentDiver } from '../game/divers.js';
 
-export const VERSION = 'V4.4.5';
+export const VERSION = 'V4.5.0';
 
 const TIPS = {
   1: 'SWIM WITH ARROWS OR THE LEFT STICK. GRAB EVERY GEM TO OPEN THE PORTAL! TAP THE MINI MAP (OR M) FOR THE FULL MAP.',
@@ -125,6 +125,7 @@ function settingsMenu(game, back) {
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
     ...accountItems(game),
+    ...(game.ads && game.ads.privacyRequired ? [{ label: 'AD PRIVACY CHOICES', act: () => game.ads.openPrivacy(), gesture: true }] : []),
     { label: 'PRIVACY & HELP', act: () => game.openLink('privacy.html') },
     { label: 'BACK', act: back },
   ];
@@ -485,6 +486,11 @@ export class DiverScene {
 }
 
 // ---------- PLAY ----------
+// result-screen buttons: every 2nd finished game, a full-screen ad plays first (iOS app only)
+function adBreak(g, items) {
+  return items.map((it) => ({ ...it, act: () => g.ads.between(it.act) }));
+}
+
 export class PlayScene {
   constructor(game, id) {
     this.game = game; this.id = id; this.spec = LEVELS[id - 1];
@@ -560,11 +566,12 @@ export class PlayScene {
       if (r === 'won') this.onWin();
       if (r === 'lost') {
         this.mode = 'lost'; this.t = 0; input.mode = 'menu';
-        this.endMenu = new Menu(g, [
+        g.ads.gameOver();
+        this.endMenu = new Menu(g, adBreak(g, [
           { label: 'TRY AGAIN', act: () => g.play(this.id) },
           { label: 'LEVEL SELECT', act: () => g.setScene(new SelectScene(g)) },
           { label: 'MAIN MENU', act: () => g.setScene(new TitleScene(g)) },
-        ]);
+        ]));
       }
       return;
     }
@@ -583,13 +590,14 @@ export class PlayScene {
     if (s.unlocked < this.id + 1) s.unlocked = Math.min(LEVELS.length + 1, this.id + 1);
     writeSave(s);
     this.mode = 'won'; this.t = 0; g.input.mode = 'menu';
+    g.ads.gameOver();
     const last = this.id >= LEVELS.length;
-    this.endMenu = new Menu(g, [
+    this.endMenu = new Menu(g, adBreak(g, [
       last ? { label: 'THE END', act: () => g.setScene(new EndScene(g)) } : { label: 'NEXT LEVEL', act: () => g.play(this.id + 1) },
       { label: 'REPLAY', act: () => g.play(this.id) },
       { label: 'LEVEL SELECT', act: () => g.setScene(new SelectScene(g)) },
       { label: 'MAIN MENU', act: () => g.setScene(new TitleScene(g)) },
-    ]);
+    ]));
   }
 
   // small radar-style map in the top-right corner (tap it for the full map)

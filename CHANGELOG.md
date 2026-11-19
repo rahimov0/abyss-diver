@@ -1,5 +1,10 @@
 # Changelog
 
+## v4.5.0 (iOS app 1.1.0)
+- iOS app: Google AdMob ads. A banner at the top of the main menu (the game moves down below it, nothing is covered) and a full-screen ad after every 2nd finished game, shown when you tap a button on the result screen. No ads during play. The web version stays ad-free.
+- Apple's tracking permission prompt on first launch, Google's consent form in the EU/UK, and Settings → AD PRIVACY CHOICES where it's required.
+- app-ads.txt, privacy policy (TR/EN) and App Store notes updated for ads.
+
 ## v4.4.5
 - Deleting your account now also clears its progress from the device (back to level 1, default diver). Before, the levels stayed on screen as guest progress and would be merged into the next account.
 - Signing out with no connection no longer drops progress that hasn't reached the cloud yet: it says so and keeps you signed in.

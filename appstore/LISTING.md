@@ -24,7 +24,7 @@ Everything to paste into App Store Connect. Field limits are in brackets.
 **Subtitle [30]:** Retro pixel deep-sea adventure
 
 **Promotional text [170]:**
-75 hand-made dives through coral reefs, sunken temples, toxic trenches and a submarine base. Free, no ads, no sign-up — just dive in.
+75 hand-made dives through coral reefs, sunken temples, toxic trenches and a submarine base. Free, no sign-up — just dive in.
 
 **Keywords [100]:**
 diver,ocean,underwater,pixel,retro,arcade,platformer,boss,deep sea,cave,adventure,offline,2d
@@ -46,7 +46,7 @@ Swim through 75 hand-crafted levels across 11 underwater worlds — from sunny c
 
 Made for touch: choose a fixed joystick, big arrow buttons or swipe controls, pick your button size, and play in portrait or landscape on iPhone and iPad. A hardware keyboard works too.
 
-Start playing immediately — no account needed. If you want to keep your progress across devices, you can optionally sign in with Apple or Google in Settings. No ads, no tracking.
+Start playing immediately — no account needed. If you want to keep your progress across devices, you can optionally sign in with Apple or Google in Settings.
 
 **What's new (1.0):** First release. 75 levels, 6 bosses, 5 divers.
 
@@ -55,7 +55,7 @@ Start playing immediately — no account needed. If you want to keep your progre
 **Alt başlık [30]:** Retro piksel dalış macerası
 
 **Tanıtım metni [170]:**
-Mercan resiflerinden batık tapınaklara, zehirli hendeklerden denizaltı üssüne 75 özel tasarım dalış. Ücretsiz, reklamsız, kayıt gerektirmez — hemen dal.
+Mercan resiflerinden batık tapınaklara, zehirli hendeklerden denizaltı üssüne 75 özel tasarım dalış. Ücretsiz, kayıt gerektirmez — hemen dal.
 
 **Anahtar kelimeler [100]:**
 dalgıç,okyanus,deniz,su altı,piksel,retro,arcade,platform,boss,mağara,macera,çevrimdışı,dalış
@@ -77,7 +77,7 @@ Klasik mobil dalış oyunlarından ilham alan retro piksel arcade macerası Abys
 
 Dokunmatik ekran için tasarlandı: sabit joystick, büyük ok tuşları veya kaydırma kontrolü seç, buton boyutunu ayarla, iPhone ve iPad'de dik ya da yan oyna.
 
-Hesap gerekmeden hemen oynamaya başla. İlerlemeni cihazlar arasında korumak istersen Ayarlar'dan isteğe bağlı olarak Apple veya Google ile giriş yapabilirsin. Reklam yok, takip yok.
+Hesap gerekmeden hemen oynamaya başla. İlerlemeni cihazlar arasında korumak istersen Ayarlar'dan isteğe bağlı olarak Apple veya Google ile giriş yapabilirsin.
 
 **Yenilikler (1.0):** İlk sürüm. 75 bölüm, 6 boss, 5 dalgıç.
 
@@ -92,13 +92,25 @@ Answer **Yes, we collect data** and add these four types. For each: *Used for:* 
 | Identifiers | User ID | Firebase account ID that the cloud save belongs to |
 | User Content | Gameplay Content | Cloud save: unlocked level, best scores/stars, chosen diver |
 
-Nothing else (no location, no diagnostics, no analytics, no ads).
+### Added with ads (v1.1, Google AdMob)
+
+Data collected by the Google Mobile Ads SDK (source: developers.google.com/admob/ios/data-disclosure). *Linked to the user:* No · *Used for tracking:* **Yes** for Device ID and Advertising Data (the app asks Apple's tracking permission), **No** for the rest.
+
+| Category | Data type | Used for |
+|---|---|---|
+| Identifiers | Device ID | Third-Party Advertising, Analytics |
+| Usage Data | Advertising Data | Third-Party Advertising, Analytics |
+| Usage Data | Product Interaction | Third-Party Advertising, Analytics |
+| Location | Coarse Location | Third-Party Advertising |
+| Diagnostics | Crash Data | Analytics |
+| Diagnostics | Performance Data | Analytics, Third-Party Advertising |
+
 
 ## Age rating questionnaire
 
 - Cartoon or Fantasy Violence: **Infrequent / Mild** (sea creatures and robot bosses, no blood)
 - Everything else (realistic violence, horror, mature themes, profanity, sexual content, drugs, alcohol, gambling, contests, simulated gambling, medical): **None**
-- Unrestricted web access: **No** · User-generated content / chat: **No** · Ads: **No** · In-app purchases: **No**
+- Unrestricted web access: **No** · User-generated content / chat: **No** · Advertising: **Yes** (since v1.1) · In-app purchases: **No**
 - Parental controls / age assurance: **No**
 
 ## App Review notes
@@ -107,6 +119,7 @@ Nothing else (no location, no diagnostics, no analytics, no ads).
 > Signing in is optional and only syncs game progress (Settings → SIGN IN WITH APPLE or SIGN IN WITH GOOGLE).
 > Account deletion: Settings → DELETE ACCOUNT (tap twice to confirm). It deletes the Firebase account and the cloud save; Apple sign-in tokens are revoked.
 > No demo account is needed. Contact: destek.rahimov@gmail.com
+> Ads (v1.1): Google AdMob banner on the main menu and a full-screen ad after every 2nd finished game; none during play. Tracking permission is asked on first launch; EU/UK consent via Google's form, changeable in Settings → AD PRIVACY CHOICES.
 
 ## Screenshots
 

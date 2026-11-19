@@ -12,6 +12,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.6.2"),
+        .package(name: "CapacitorCommunityAdmob", path: "../../../node_modules/@capacitor-community/admob"),
         .package(name: "CapacitorFirebaseAuthentication", path: "symlinks/CapacitorFirebaseAuthentication", traits: ["Google"]),
         .package(name: "CapacitorFirebaseFirestore", path: "symlinks/CapacitorFirebaseFirestore"),
         .package(name: "CapacitorBrowser", path: "../../../node_modules/@capacitor/browser"),
@@ -23,6 +24,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
+                .product(name: "CapacitorCommunityAdmob", package: "CapacitorCommunityAdmob"),
                 .product(name: "CapacitorFirebaseAuthentication", package: "CapacitorFirebaseAuthentication"),
                 .product(name: "CapacitorFirebaseFirestore", package: "CapacitorFirebaseFirestore"),
                 .product(name: "CapacitorBrowser", package: "CapacitorBrowser"),

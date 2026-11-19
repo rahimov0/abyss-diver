@@ -18,6 +18,8 @@ html, body {
 }
 /* iPhone Safari (not added to home screen) blurs a strip under the status bar: keep the HUD below it */
 html.ios-browser #wrap { top: calc(env(safe-area-inset-top, 0px) + 26px); }
+/* iOS app: the game box starts below the ad banner while one is on screen (main menu only) */
+html.native-app #wrap { top: calc(env(safe-area-inset-top, 0px) + var(--ad-top, 0px)); }
 canvas#game {
   display: block; position: absolute; left: 0; top: 0;
   image-rendering: pixelated; image-rendering: crisp-edges;
