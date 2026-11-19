@@ -92,19 +92,18 @@ Answer **Yes, we collect data** and add these four types. For each: *Used for:* 
 | Identifiers | User ID | Firebase account ID that the cloud save belongs to |
 | User Content | Gameplay Content | Cloud save: unlocked level, best scores/stars, chosen diver |
 
-### Added with ads (v1.1, Google AdMob)
+### Added with ads (v1.1, Google AdMob) — published 19 Nov 2026
 
-Data collected by the Google Mobile Ads SDK (source: developers.google.com/admob/ios/data-disclosure). *Linked to the user:* No · *Used for tracking:* **Yes** for Device ID and Advertising Data (the app asks Apple's tracking permission), **No** for the rest.
+Data collected by the Google Mobile Ads SDK (source: developers.google.com/admob/ios/data-disclosure).
 
-| Category | Data type | Used for |
-|---|---|---|
-| Identifiers | Device ID | Third-Party Advertising, Analytics |
-| Usage Data | Advertising Data | Third-Party Advertising, Analytics |
-| Usage Data | Product Interaction | Third-Party Advertising, Analytics |
-| Location | Coarse Location | Third-Party Advertising |
-| Diagnostics | Crash Data | Analytics |
-| Diagnostics | Performance Data | Analytics, Third-Party Advertising |
-
+| Category | Data type | Used for | Linked | Tracking |
+|---|---|---|---|---|
+| Identifiers | Device ID | Third-Party Advertising, Analytics | Yes | **Yes** |
+| Usage Data | Advertising Data | Third-Party Advertising, Analytics | Yes | **Yes** |
+| Usage Data | Product Interaction | Third-Party Advertising, Analytics | Yes | No |
+| Location | Coarse Location | Third-Party Advertising, Analytics | Yes | No |
+| Diagnostics | Crash Data | Analytics | No | No |
+| Diagnostics | Performance Data | Third-Party Advertising, Analytics | Yes | No |
 
 ## Age rating questionnaire
 
