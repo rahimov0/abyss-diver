@@ -19,7 +19,29 @@ export class Ads {
     this.interLoaded = false;
     this.showing = false;
     this.privacyRequired = false;
-    if (this.enabled) this.init().catch((e) => console.warn('ads init failed', e));
+    this.off = false; // the player bought "Remove Ads"
+    // wait for the App Store to say whether ads were removed, so a paying player never sees the ad prompts
+    if (this.enabled) game.store.ready.then(() => { if (!game.save.noAds) this.start(); else this.off = true; });
+  }
+
+  // turn ads off for good (purchase) / back on (refund)
+  stop() {
+    this.off = true;
+    this.setTop(0);
+    const had = this.banner !== 'none';
+    this.banner = 'none';
+    this.games = 0;
+    if (this.ready && had) {
+      try { Promise.resolve(this.A.removeBanner()).catch(() => {}); } catch (e) { console.warn('removeBanner', e); }
+    }
+  }
+
+  start() {
+    this.off = false;
+    if (this.enabled && !this.ready && !this.starting) {
+      this.starting = true;
+      this.init().catch((e) => console.warn('ads init failed', e)).finally(() => { this.starting = false; });
+    }
   }
 
   async init() {
@@ -43,7 +65,7 @@ export class Ads {
     A.addListener('bannerAdSizeChanged', (s) => {
       const h = (s && s.height) || 0;
       // a banner that finished loading after the player already left the menu: take it away again
-      if (h > 0 && this.banner !== 'shown') { this.A.hideBanner().catch(() => {}); this.setTop(0); return; }
+      if (h > 0 && (this.banner !== 'shown' || this.off)) { this.A.hideBanner().catch(() => {}); this.setTop(0); return; }
       this.setTop(this.banner === 'shown' ? h : 0);
     });
     A.addListener('interstitialAdLoaded', () => { this.interLoaded = true; });
@@ -61,7 +83,7 @@ export class Ads {
 
   // called every frame with "should the banner be on screen now?"
   wantBanner(on) {
-    if (!this.ready || !this.enabled || this.showing) return;
+    if (!this.ready || !this.enabled || this.off || this.showing) return;
     if (on && this.banner !== 'shown') {
       const first = this.banner === 'none';
       this.banner = 'shown';
@@ -82,11 +104,11 @@ export class Ads {
   }
 
   // a game just ended (won or lost)
-  gameOver() { this.games++; }
+  gameOver() { if (!this.off) this.games++; }
 
   // run `then` right away, or after a full-screen ad when one is due
   between(then) {
-    if (!this.ready || !this.enabled || this.games < GAMES_PER_AD || !this.interLoaded || this.showing) { then(); return; }
+    if (!this.ready || !this.enabled || this.off || this.games < GAMES_PER_AD || !this.interLoaded || this.showing) { then(); return; }
     this.showing = true; this.then = then; this.games = 0; this.interLoaded = false;
     const au = this.game.audio && this.game.audio.ctx;
     if (au && au.state === 'running') au.suspend().catch(() => {});

@@ -20,10 +20,16 @@ const ROWS = {
   '<': ['..#', '.#.', '#..', '.#.', '..#'], '>': ['#..', '.#.', '..#', '.#.', '#..'], '=': ['...', '###', '...', '###', '...'],
   '_': ['...', '...', '...', '...', '###'], '#': ['#.#', '###', '#.#', '###', '#.#'], '*': ['.#.', '###', '.#.', '#.#', '...'],
   '&': ['.#.', '#.#', '.#.', '#.#', '.##'], '"': ['#.#', '#.#', '...', '...', '...'], ' ': ['...', '...', '...', '...', '...'],
+  // currency signs for App Store prices
+  $: ['.##', '##.', '.#.', '.##', '##.'], '€': ['.##', '##.', '#..', '##.', '.##'], '£': ['.##', '.#.', '###', '.#.', '###'],
+  '₺': ['.#.', '.##', '##.', '.#.', '.##'], '¥': ['#.#', '.#.', '###', '.#.', '.#.'],
 };
 const CHARS = Object.keys(ROWS);
 const INDEX = new Map(CHARS.map((c, i) => [c, i]));
 const cache = new Map();
+
+// true if every character of str has a glyph (after upper-casing, like drawText)
+export function canDraw(str) { return [...String(str).toUpperCase()].every((ch) => INDEX.has(ch)); }
 
 function atlas(color) {
   let c = cache.get(color);

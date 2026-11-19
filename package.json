@@ -23,6 +23,7 @@
     "@capacitor/core": "^8.6.2",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.6.2",
+    "@capgo/native-purchases": "^8.9.16",
     "firebase": "^12.19.0"
   },
   "iosVersion": "1.1.0"

@@ -119,6 +119,7 @@ Data collected by the Google Mobile Ads SDK (source: developers.google.com/admob
 > Account deletion: Settings → DELETE ACCOUNT (tap twice to confirm). It deletes the Firebase account and the cloud save; Apple sign-in tokens are revoked.
 > No demo account is needed. Contact: destek.rahimov@gmail.com
 > Ads (v1.1): Google AdMob banner on the main menu and a full-screen ad after every 2nd finished game; none during play. Tracking permission is asked on first launch; EU/UK consent via Google's form, changeable in Settings → AD PRIVACY CHOICES.
+> In-app purchase (v1.1): non-consumable "Remove Ads" (tr.rahimov.abyssdiver.removeads, $0.99). Buy: main menu → REMOVE ADS, or Settings → REMOVE ADS. Restore: Settings → RESTORE PURCHASES. After purchase the banner disappears at once and no more interstitials or ad prompts are shown.
 
 ## Screenshots
 

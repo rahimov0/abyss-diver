@@ -5,6 +5,7 @@ import { TitleScene, PlayScene } from './ui/scenes.js';
 import { LEVELS } from './level/levels.js';
 import { Cloud, NATIVE, plugin } from './cloud.js';
 import { Ads } from './ads.js';
+import { Store } from './store.js';
 
 class Game {
   constructor(canvas) {
@@ -13,6 +14,7 @@ class Game {
     this.view = { w: 216, h: 320 };
     this.save = loadSave();
     this.cloud = new Cloud(this);
+    this.store = new Store(this);
     this.ads = new Ads(this);
     this.audio = new Audio();
     this.audio.sfxOn = this.save.sound;

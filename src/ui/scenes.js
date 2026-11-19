@@ -125,7 +125,8 @@ function settingsMenu(game, back) {
     { label: () => `SOUND  ${s.sound ? 'ON' : 'OFF'}`, act: () => { s.sound = !s.sound; game.audio.sfxOn = s.sound; save(); } },
     { label: () => `MUSIC  ${s.music ? 'ON' : 'OFF'}`, act: () => { s.music = !s.music; game.audio.setMusic(s.music); save(); } },
     ...accountItems(game),
-    ...(game.ads && game.ads.privacyRequired ? [{ label: 'AD PRIVACY CHOICES', act: () => game.ads.openPrivacy(), gesture: true }] : []),
+    ...storeItems(game),
+    ...(game.ads && game.ads.privacyRequired && !s.noAds ? [{ label: 'AD PRIVACY CHOICES', act: () => game.ads.openPrivacy(), gesture: true }] : []),
     { label: 'PRIVACY & HELP', act: () => game.openLink('privacy.html') },
     { label: 'BACK', act: back },
   ];
@@ -133,6 +134,18 @@ function settingsMenu(game, back) {
   // the account buttons change with the sign-in state, so the list is rebuilt every frame
   m.refresh = () => { m.items = build(); if (m.sel >= m.items.length) m.sel = m.items.length - 1; };
   return m;
+}
+
+// ---------- "Remove Ads" purchase (iOS app only) ----------
+function storeItems(game) {
+  const st = game.store;
+  if (!st || !st.enabled) return [];
+  return [
+    st.owned
+      ? { label: 'ADS REMOVED - THANK YOU', act: () => game.cloud.say('ADS ARE OFF ON THIS APPLE ID') }
+      : { label: () => (st.busy === 'buying' ? 'OPENING APP STORE...' : `REMOVE ADS  ${st.price || '$0.99'}`), act: () => st.buy() },
+    { label: () => (st.busy === 'restoring' ? 'RESTORING...' : 'RESTORE PURCHASES'), act: () => st.restore() },
+  ];
 }
 
 // ---------- cloud account (optional: Google, or Apple in the iOS app) ----------
@@ -252,12 +265,18 @@ export class TitleScene {
     this.game = game; this.t = 0;
     this.S = buildSprites(BIOME[0], currentDiver(game.save).pal);
     const s = game.save;
-    this.menu = new Menu(game, [
+    const build = () => [
       { label: () => (s.unlocked > 1 ? `CONTINUE  LV ${Math.min(s.unlocked, LEVELS.length)}` : 'START DIVE'), act: () => game.play(Math.min(s.unlocked, LEVELS.length)) },
       { label: 'SELECT LEVEL', act: () => game.setScene(new SelectScene(game)) },
       { label: () => `DIVER  ${currentDiver(s).name}`, act: () => game.setScene(new DiverScene(game)) },
+      // iOS app: one-tap "Remove Ads" right on the menu where the banner is (hidden once bought)
+      ...(game.store && game.store.enabled && !s.noAds
+        ? [{ label: () => (game.store.busy === 'buying' ? 'OPENING APP STORE...' : `REMOVE ADS  ${game.store.price || '$0.99'}`), act: () => game.store.buy() }]
+        : []),
       { label: 'SETTINGS', act: () => { this.mode = 'settings'; this.settings.sel = 0; } },
-    ]);
+    ];
+    this.menu = new Menu(game, build());
+    this.menu.refresh = () => { const n = this.menu.items.length; this.menu.items = build(); if (this.menu.items.length !== n) this.menu.sel = Math.min(this.menu.sel, this.menu.items.length - 1); };
     this.mode = 'main';
     this.settings = settingsMenu(game, () => { this.mode = 'main'; });
     game.input.mode = 'menu';
@@ -266,6 +285,7 @@ export class TitleScene {
   update(input) {
     this.t++;
     if (this.mode === 'settings') { if (input.back()) { this.mode = 'main'; return; } this.settings.update(input); return; }
+    this.menu.refresh();
     this.menu.update(input);
   }
   draw(ctx) {

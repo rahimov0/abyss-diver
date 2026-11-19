@@ -4,6 +4,8 @@
 - iOS app: Google AdMob ads. A banner at the top of the main menu (the game moves down below it, nothing is covered) and a full-screen ad after every 2nd finished game, shown when you tap a button on the result screen. No ads during play. The web version stays ad-free.
 - Apple's tracking permission prompt on first launch, Google's consent form in the EU/UK, and Settings → AD PRIVACY CHOICES where it's required.
 - app-ads.txt, privacy policy (TR/EN) and App Store notes updated for ads.
+- "Remove Ads" one-time purchase ($0.99, price shown in the player's currency) on the main menu and in Settings, plus RESTORE PURCHASES. Once bought, the banner goes away at once and the ad SDK, ad prompts and full-screen ads are never started again. A refund brings ads back.
+- Pixel font: $ € £ ₺ ¥ signs for prices.
 
 ## v4.4.5
 - Deleting your account now also clears its progress from the device (back to level 1, default diver). Before, the levels stayed on screen as guest progress and would be merged into the next account.
